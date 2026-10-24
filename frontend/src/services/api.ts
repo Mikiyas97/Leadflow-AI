@@ -6,6 +6,7 @@ import type {
   TargetProfile,
   AutomationRun,
   ActivityLog,
+  DiscoverySchedule,
 } from '../types';
 
 const API_BASE = '/api';
@@ -68,14 +69,17 @@ export const api = {
     request<void>(`/target-profiles/${id}`, { method: 'DELETE' }),
 
   // Leads
-  getLeads: (params?: { search?: string; status?: string; min_score?: number }) => {
+  getLeads: (params?: { search?: string; status?: string; min_score?: number; is_overdue?: boolean }) => {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.append('search', params.search);
     if (params?.status && params.status !== 'ALL') searchParams.append('status', params.status);
     if (params?.min_score !== undefined) searchParams.append('min_score', params.min_score.toString());
+    if (params?.is_overdue) searchParams.append('is_overdue', 'true');
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
     return request<Lead[]>(`/leads${query}`);
   },
+
+  getOverdueLeads: () => request<Lead[]>('/leads/overdue'),
 
   getLead: (id: number) => request<LeadDetail>(`/leads/${id}`),
 
@@ -176,6 +180,26 @@ export const api = {
   getDiscoveryRun: (id: number) => request<AutomationRun>(`/discovery-runs/${id}`),
   getDiscoveryRuns: () => request<AutomationRun[]>('/discovery-runs'),
 
+  // Discovery Schedules (FR-10)
+  getSchedules: () => request<DiscoverySchedule[]>('/schedules'),
+  createSchedule: (data: Omit<DiscoverySchedule, 'id' | 'created_at' | 'last_run_at' | 'next_run_at'>) =>
+    request<DiscoverySchedule>('/schedules', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateSchedule: (id: number, data: Partial<DiscoverySchedule>) =>
+    request<DiscoverySchedule>(`/schedules/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteSchedule: (id: number) =>
+    request<void>(`/schedules/${id}`, { method: 'DELETE' }),
+  triggerScheduleNow: (id: number) =>
+    request<{ success: boolean; message: string; run_id: number }>(`/schedules/${id}/trigger`, {
+      method: 'POST',
+    }),
+
   // Activity Logs
   getActivityLogs: (limit: number = 50) => request<ActivityLog[]>(`/activity?limit=${limit}`),
 };
+

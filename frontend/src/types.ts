@@ -147,11 +147,55 @@ export interface ActivityLog {
   created_at: string;
 }
 
+export interface OverdueLeadItem {
+  id: number;
+  company_name: string;
+  website: string;
+  location?: string | null;
+  industry?: string | null;
+  follow_up_date: string;
+  follow_up_notes?: string | null;
+  follow_up_status?: string | null;
+  days_overdue: number;
+}
+
+export interface PerformanceSummary {
+  total_leads_discovered: number;
+  total_qualified_leads: number;
+  total_drafts_prepared: number;
+  total_approved_drafts: number;
+  total_sent_emails: number;
+  qualification_rate: number;
+}
+
+export interface DiscoverySchedule {
+  id: number;
+  profile_id?: number | null;
+  name: string;
+  interval_hours: number;
+  industry: string;
+  location?: string | null;
+  company_size?: string | null;
+  criteria: string;
+  max_leads: number;
+  is_active: boolean;
+  last_run_at?: string | null;
+  next_run_at?: string | null;
+  created_at: string;
+}
+
 export interface DashboardStats {
   total_leads: number;
   qualified_leads: number;
   pending_drafts: number;
   approved_drafts: number;
+  overdue_followups_count?: number;
+  total_drafts_prepared?: number;
+  sent_emails?: number;
+  qualification_rate?: number;
+  overdue_leads?: OverdueLeadItem[];
+  performance_summary?: PerformanceSummary;
   recent_runs: AutomationRun[];
   recent_activities: ActivityLog[];
 }
+
