@@ -56,14 +56,16 @@ def test_draft_approval_workflow():
 
 
 def test_chat_endpoint():
-    payload = {
-        "messages": [
-            {"role": "user", "content": "How do I find high-fit B2B leads?"}
-        ]
-    }
-    response = client.post("/api/chat", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["role"] == "assistant"
-    assert len(data["content"]) > 0
+    from unittest.mock import patch
+    with patch("backend.app.routes.chat.gemini_service.is_configured", return_value=False):
+        payload = {
+            "messages": [
+                {"role": "user", "content": "Hello, how can you help me today?"}
+            ]
+        }
+        response = client.post("/api/chat", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["role"] == "assistant"
+        assert len(data["content"]) > 0
 

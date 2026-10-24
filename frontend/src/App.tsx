@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar, type ActiveTab } from './components/Navbar';
+import { Sidebar, type ActiveTab } from './components/Sidebar';
 import { ChatbotUI } from './components/ChatbotUI';
 import { DashboardView } from './components/DashboardView';
 import { LeadExplorerView } from './components/LeadExplorerView';
@@ -10,13 +10,14 @@ import { LeadDetailModal } from './components/LeadDetailModal';
 import { DiscoveryModal } from './components/DiscoveryModal';
 import type { DashboardStats, TargetProfile } from './types';
 import { api } from './services/api';
-import { KeyRound, Send, CheckCircle2, AlertCircle } from 'lucide-react';
+import { KeyRound, Send, CheckCircle2, AlertCircle, Menu, Flame } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('agent');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loadingStats, setLoadingStats] = useState<boolean>(true);
   const [isBackendHealthy, setIsBackendHealthy] = useState<boolean>(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Modals
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
@@ -42,7 +43,7 @@ export const App: React.FC = () => {
       setIsBackendHealthy(health.status === 'healthy');
       const statsData = await api.getDashboardStats();
       setStats(statsData);
-    } catch (err) {
+    } catch {
       setIsBackendHealthy(false);
     } finally {
       setLoadingStats(false);
@@ -85,10 +86,10 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-slate-100 flex flex-col font-sans selection:bg-[#f95721] selection:text-white">
+    <div className="min-h-screen bg-[#09090b] text-slate-100 flex font-sans selection:bg-[#f95721] selection:text-white">
       
-      {/* Top Universal Navbar */}
-      <Navbar
+      {/* Side Navigation Bar */}
+      <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onOpenDiscovery={() => {
@@ -98,52 +99,82 @@ export const App: React.FC = () => {
         onOpenTestSmtp={() => setIsTestSmtpOpen(true)}
         isBackendHealthy={isBackendHealthy}
         overdueCount={stats?.overdue_followups_count || 0}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      {/* Main View Router */}
-      <main className="flex-1 flex flex-col">
-        {activeTab === 'agent' && <ChatbotUI />}
+      {/* Main Content Area */}
+      <div className="flex-1 md:ml-64 flex flex-col min-w-0 min-h-screen bg-[#09090b]">
+        
+        {/* Mobile Header Bar */}
+        <header className="md:hidden flex items-center justify-between p-3.5 bg-[#0a0a0d] border-b border-[#1c1c24] sticky top-0 z-30">
+          <button
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="p-2 rounded-xl bg-[#14141c] border border-[#22222e] text-slate-300 hover:text-white"
+            aria-label="Open Navigation Sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
 
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            stats={stats}
-            loading={loadingStats}
-            onRefresh={checkHealthAndLoadStats}
-            onNavigateTab={setActiveTab}
-            onOpenDiscovery={() => {
-              setDiscoveryProfile(null);
-              setIsDiscoveryOpen(true);
-            }}
-            onSelectLead={(id) => setSelectedLeadId(id)}
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-[#f95721] flex items-center justify-center text-white">
+              <Flame className="w-4 h-4 fill-current" />
+            </div>
+            <span className="font-bold text-sm text-white">LeadFlow AI</span>
+          </div>
+
+          <div
+            className={`h-2.5 w-2.5 rounded-full ${
+              isBackendHealthy ? 'bg-emerald-400' : 'bg-red-500 animate-pulse'
+            }`}
           />
-        )}
+        </header>
 
-        {activeTab === 'leads' && (
-          <LeadExplorerView
-            onSelectLead={(id) => setSelectedLeadId(id)}
-            onOpenDiscovery={() => {
-              setDiscoveryProfile(null);
-              setIsDiscoveryOpen(true);
-            }}
-          />
-        )}
+        {/* View Content */}
+        <main className="flex-1 flex flex-col">
+          {activeTab === 'agent' && <ChatbotUI />}
 
-        {activeTab === 'outreach' && (
-          <OutreachReviewView onRefreshStats={loadStatsSilently} />
-        )}
+          {activeTab === 'dashboard' && (
+            <DashboardView
+              stats={stats}
+              loading={loadingStats}
+              onRefresh={checkHealthAndLoadStats}
+              onNavigateTab={setActiveTab}
+              onOpenDiscovery={() => {
+                setDiscoveryProfile(null);
+                setIsDiscoveryOpen(true);
+              }}
+              onSelectLead={(id) => setSelectedLeadId(id)}
+            />
+          )}
 
-        {activeTab === 'criteria' && (
-          <CriteriaAndSchedulesView
-            onOpenDiscoveryWithProfile={(p) => {
-              setDiscoveryProfile(p);
-              setIsDiscoveryOpen(true);
-            }}
-            onRefreshDashboard={loadStatsSilently}
-          />
-        )}
+          {activeTab === 'leads' && (
+            <LeadExplorerView
+              onSelectLead={(id) => setSelectedLeadId(id)}
+              onOpenDiscovery={() => {
+                setDiscoveryProfile(null);
+                setIsDiscoveryOpen(true);
+              }}
+            />
+          )}
 
-        {activeTab === 'activity' && <ActivityFeedView />}
-      </main>
+          {activeTab === 'outreach' && (
+            <OutreachReviewView onRefreshStats={loadStatsSilently} />
+          )}
+
+          {activeTab === 'criteria' && (
+            <CriteriaAndSchedulesView
+              onOpenDiscoveryWithProfile={(p) => {
+                setDiscoveryProfile(p);
+                setIsDiscoveryOpen(true);
+              }}
+              onRefreshDashboard={loadStatsSilently}
+            />
+          )}
+
+          {activeTab === 'activity' && <ActivityFeedView />}
+        </main>
+      </div>
 
       {/* Global Lead Detail Modal */}
       {selectedLeadId && (

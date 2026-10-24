@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import type { DashboardStats, OverdueLeadItem } from '../types';
 import { api } from '../services/api';
-import type { ActiveTab } from './Navbar';
+import type { ActiveTab } from './Sidebar';
 
 interface DashboardViewProps {
   stats: DashboardStats | null;

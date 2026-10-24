@@ -11,6 +11,7 @@ Covers:
 - Hunter.io zero fake contacts enforcement
 """
 import uuid
+import asyncio
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 import smtplib
@@ -32,43 +33,45 @@ client = TestClient(app)
 # ---------------------------------------------------------------------------
 # Acceptance Test A: Exact Criteria & Website Investigation for Addis Ababa
 # ---------------------------------------------------------------------------
-@pytest.mark.asyncio
-async def test_acceptance_a_hotels_addis_ababa_website_investigation():
-    query = "Find 5 hotels in Addis Ababa without an official website and draft website-development emails"
-    parsed = discovery_service.parse_search_query(query)
+def test_acceptance_a_hotels_addis_ababa_website_investigation():
+    async def _test():
+        query = "Find 5 hotels in Addis Ababa without an official website and draft website-development emails"
+        parsed = discovery_service.parse_search_query(query)
 
-    # 1. Preserves Addis Ababa / Ethiopia location (never reverts to US)
-    assert "Addis Ababa" in parsed["location"] or "Ethiopia" in parsed["location"]
-    assert "United States" not in parsed["location"]
-    assert parsed["target_quantity"] == 5
-    assert parsed["require_no_website"] is True
-    assert "Website" in parsed["service_offered"]
+        # 1. Preserves Addis Ababa / Ethiopia location (never reverts to US)
+        assert "Addis Ababa" in parsed["location"] or "Ethiopia" in parsed["location"]
+        assert "United States" not in parsed["location"]
+        assert parsed["target_quantity"] == 5
+        assert parsed["require_no_website"] is True
+        assert "Website" in parsed["service_offered"]
 
-    # 2. Investigates official website status with evidence (Mocked search for deterministic testing)
-    with patch.object(firecrawl_service, "search_web", new_callable=AsyncMock) as mock_search:
-        # Candidate with directory listings only
-        mock_search.return_value = [
-            {"url": "https://www.tripadvisor.com/Hotel_Review-g293791-d12345-Addis.html", "title": "Bole Ambassador Hotel - TripAdvisor"},
-            {"url": "https://www.facebook.com/boleambassador", "title": "Bole Ambassador Hotel Facebook"}
-        ]
-        result_with_dirs = await firecrawl_service.investigate_official_website(
-            company_name="Bole Ambassador Hotel",
-            location="Addis Ababa, Ethiopia",
-            initial_url="https://facebook.com/boleambassador"
-        )
-        assert result_with_dirs["website_status"] == "NO_OFFICIAL_WEBSITE_FOUND"
-        assert "tripadvisor.com" in result_with_dirs["evidence"].lower() or "facebook.com" in result_with_dirs["evidence"].lower()
+        # 2. Investigates official website status with evidence (Mocked search for deterministic testing)
+        with patch.object(firecrawl_service, "search_web", new_callable=AsyncMock) as mock_search:
+            # Candidate with directory listings only
+            mock_search.return_value = [
+                {"url": "https://www.tripadvisor.com/Hotel_Review-g293791-d12345-Addis.html", "title": "Bole Ambassador Hotel - TripAdvisor"},
+                {"url": "https://www.facebook.com/boleambassador", "title": "Bole Ambassador Hotel Facebook"}
+            ]
+            result_with_dirs = await firecrawl_service.investigate_official_website(
+                company_name="Bole Ambassador Hotel",
+                location="Addis Ababa, Ethiopia",
+                initial_url="https://facebook.com/boleambassador"
+            )
+            assert result_with_dirs["website_status"] == "NO_OFFICIAL_WEBSITE_FOUND"
+            assert "tripadvisor.com" in result_with_dirs["evidence"].lower() or "facebook.com" in result_with_dirs["evidence"].lower()
 
-        # Candidate with dedicated official domain
-        mock_search.return_value = [
-            {"url": "https://sheratonaddis.com/en-us", "title": "Sheraton Addis Official Hotel Site"}
-        ]
-        result_official = await firecrawl_service.investigate_official_website(
-            company_name="Sheraton Addis",
-            location="Addis Ababa, Ethiopia",
-            initial_url=None
-        )
-        assert result_official["website_status"] == "HAS_OFFICIAL_WEBSITE"
+            # Candidate with dedicated official domain
+            mock_search.return_value = [
+                {"url": "https://sheratonaddis.com/en-us", "title": "Sheraton Addis Official Hotel Site"}
+            ]
+            result_official = await firecrawl_service.investigate_official_website(
+                company_name="Sheraton Addis",
+                location="Addis Ababa, Ethiopia",
+                initial_url=None
+            )
+            assert result_official["website_status"] == "HAS_OFFICIAL_WEBSITE"
+
+    asyncio.run(_test())
 
 
 # ---------------------------------------------------------------------------
@@ -119,33 +122,35 @@ def test_acceptance_c_disqualified_lead_scores_under_threshold():
 # ---------------------------------------------------------------------------
 # Acceptance Test D: Hunter.io Returns Zero Fake Contacts
 # ---------------------------------------------------------------------------
-@pytest.mark.asyncio
-async def test_acceptance_d_hunter_returns_no_fake_contacts():
-    with patch.object(hunter_service, "is_configured", return_value=False):
-        contacts = await hunter_service.search_domain("some-nonexistent-domain.com")
-        assert len(contacts) == 0
+def test_acceptance_d_hunter_returns_no_fake_contacts():
+    async def _test():
+        with patch.object(hunter_service, "is_configured", return_value=False):
+            contacts = await hunter_service.search_domain("some-nonexistent-domain.com")
+            assert len(contacts) == 0
 
-    with patch("httpx.AsyncClient.get") as mock_get:
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "data": {
-                "emails": [
-                    {
-                        "value": "lowconf@example.com",
-                        "first_name": "Low",
-                        "last_name": "Confidence",
-                        "confidence": 45
-                    }
-                ]
+        with patch("httpx.AsyncClient.get") as mock_get:
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {
+                "data": {
+                    "emails": [
+                        {
+                            "value": "lowconf@example.com",
+                            "first_name": "Low",
+                            "last_name": "Confidence",
+                            "confidence": 45
+                        }
+                    ]
+                }
             }
-        }
-        mock_get.return_value = mock_resp
-        with patch.object(hunter_service, "is_configured", return_value=True):
-            contacts = await hunter_service.search_domain("example.com")
-            assert len(contacts) == 1
-            assert contacts[0]["email_status"] == "unverified"
-            assert contacts[0]["name"] != "Sarah Jenkins"
+            mock_get.return_value = mock_resp
+            with patch.object(hunter_service, "is_configured", return_value=True):
+                contacts = await hunter_service.search_domain("example.com")
+                assert len(contacts) == 1
+                assert contacts[0]["email_status"] == "unverified"
+                assert contacts[0]["name"] != "Sarah Jenkins"
+
+    asyncio.run(_test())
 
 
 # ---------------------------------------------------------------------------
