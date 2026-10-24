@@ -137,7 +137,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-slate-500 font-medium">discovered</span>
           </div>
           <button
-            onClick={() => onNavigateTab('leads')}
+            onClick={() => onNavigateTab('manage-leads')}
             className="mt-2 text-[10px] text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1"
           >
             View all leads &rarr;
@@ -253,10 +253,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {overdueCount > 0 && (
             <button
-              onClick={() => onNavigateTab('leads')}
+              onClick={() => onNavigateTab('manage-leads')}
               className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 self-start sm:self-center"
             >
-              <span>View Filtered in Lead Explorer</span>
+              <span>View Overdue in Manage Leads</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}

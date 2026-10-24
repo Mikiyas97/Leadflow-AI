@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar, type ActiveTab } from './components/Sidebar';
 import { ChatbotUI } from './components/ChatbotUI';
 import { DashboardView } from './components/DashboardView';
-import { LeadExplorerView } from './components/LeadExplorerView';
+import { SearchLeadsView } from './components/SearchLeadsView';
+import { ManageLeadsView } from './components/ManageLeadsView';
 import { OutreachReviewView } from './components/OutreachReviewView';
 import { CriteriaAndSchedulesView } from './components/CriteriaAndSchedulesView';
 import { ActivityFeedView } from './components/ActivityFeedView';
@@ -148,13 +149,19 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'leads' && (
-            <LeadExplorerView
+          {activeTab === 'search-leads' && (
+            <SearchLeadsView
               onSelectLead={(id) => setSelectedLeadId(id)}
-              onOpenDiscovery={() => {
-                setDiscoveryProfile(null);
-                setIsDiscoveryOpen(true);
-              }}
+              onNavigateToManage={() => setActiveTab('manage-leads')}
+              onRefreshParentStats={loadStatsSilently}
+            />
+          )}
+
+          {activeTab === 'manage-leads' && (
+            <ManageLeadsView
+              onSelectLead={(id) => setSelectedLeadId(id)}
+              onNavigateToSearch={() => setActiveTab('search-leads')}
+              onRefreshParentStats={loadStatsSilently}
             />
           )}
 

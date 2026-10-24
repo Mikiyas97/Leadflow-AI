@@ -9,11 +9,12 @@ import {
   Sparkles,
   KeyRound,
   MessageSquareCode,
+  Compass,
   ChevronRight,
   X
 } from 'lucide-react';
 
-export type ActiveTab = 'agent' | 'dashboard' | 'leads' | 'outreach' | 'criteria' | 'activity';
+export type ActiveTab = 'agent' | 'dashboard' | 'search-leads' | 'manage-leads' | 'outreach' | 'criteria' | 'activity';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -52,9 +53,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
     },
     {
-      id: 'leads' as ActiveTab,
-      label: 'Lead Explorer',
-      desc: 'Search & Status Filter',
+      id: 'search-leads' as ActiveTab,
+      label: 'Search Leads',
+      desc: 'AI Discovery & Hunting',
+      icon: Compass,
+    },
+    {
+      id: 'manage-leads' as ActiveTab,
+      label: 'Manage Leads',
+      desc: 'Saved Pipeline & Status',
       icon: Users,
     },
     {

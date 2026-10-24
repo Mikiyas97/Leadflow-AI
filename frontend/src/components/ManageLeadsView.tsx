@@ -7,28 +7,39 @@ import {
   ChevronRight,
   Trash2,
   RefreshCw,
-  Sparkles,
   MapPin,
   AlertTriangle,
-  Calendar
+  Calendar,
+  ArrowUpDown,
+  Compass,
+  CheckCircle2,
+  Clock,
+  Layers
 } from 'lucide-react';
 import type { Lead } from '../types';
 import { api } from '../services/api';
 
-interface LeadExplorerViewProps {
+interface ManageLeadsViewProps {
   onSelectLead: (leadId: number) => void;
-  onOpenDiscovery: () => void;
+  onNavigateToSearch: () => void;
+  onRefreshParentStats?: () => void;
 }
 
-export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
+type SortField = 'score' | 'name' | 'date';
+type SortOrder = 'asc' | 'desc';
+
+export const ManageLeadsView: React.FC<ManageLeadsViewProps> = ({
   onSelectLead,
-  onOpenDiscovery,
+  onNavigateToSearch,
+  onRefreshParentStats,
 }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isOverdueOnly, setIsOverdueOnly] = useState<boolean>(false);
+  const [sortField, setSortField] = useState<SortField>('score');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,8 +56,11 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
         is_overdue: isOverdueOnly || undefined,
       });
       setLeads(data);
+      if (onRefreshParentStats) {
+        onRefreshParentStats();
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to load prospective leads');
+      setError(err.message || 'Failed to load saved leads');
     } finally {
       setLoading(false);
     }
@@ -63,6 +77,7 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
       setLeads((prev) =>
         prev.map((l) => (l.id === leadId ? { ...l, status: newStatus as any } : l))
       );
+      if (onRefreshParentStats) onRefreshParentStats();
     } catch (err: any) {
       alert(`Could not update lead status: ${err.message}`);
     }
@@ -70,15 +85,50 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
 
   const handleDeleteLead = async (e: React.MouseEvent, leadId: number) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to delete this prospect lead record?')) return;
+    if (!confirm('Are you sure you want to delete this saved lead record?')) return;
 
     try {
       await api.deleteLead(leadId);
       setLeads((prev) => prev.filter((l) => l.id !== leadId));
+      if (onRefreshParentStats) onRefreshParentStats();
     } catch (err: any) {
       alert(`Could not delete lead: ${err.message}`);
     }
   };
+
+  const handleSortToggle = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
+
+  // Sort leads client-side
+  const sortedLeads = [...leads].sort((a, b) => {
+    let factor = sortOrder === 'asc' ? 1 : -1;
+    if (sortField === 'score') {
+      const scoreA = a.fit_score ?? -1;
+      const scoreB = b.fit_score ?? -1;
+      return (scoreA - scoreB) * factor;
+    }
+    if (sortField === 'name') {
+      return a.company_name.localeCompare(b.company_name) * factor;
+    }
+    if (sortField === 'date') {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return (dateA - dateB) * factor;
+    }
+    return 0;
+  });
+
+  // KPI Calculations
+  const totalCount = leads.length;
+  const qualifiedCount = leads.filter((l) => l.status === 'QUALIFIED').length;
+  const contactedCount = leads.filter((l) => l.status === 'CONTACTED').length;
+  const overdueCount = leads.filter((l) => (l as any).is_overdue).length;
 
   const getScoreBadge = (score: number | null | undefined) => {
     if (score === null || score === undefined) {
@@ -90,49 +140,92 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
     }
     if (score >= 80) {
       return (
-        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
           {score}/100 High Fit
         </span>
       );
     }
     if (score >= 65) {
       return (
-        <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/25">
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/25">
           {score}/100 Moderate
         </span>
       );
     }
     return (
-      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/25">
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/25">
         {score}/100 Unqualified
       </span>
     );
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6 animate-fade-in font-sans">
       
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#1c1c24]">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <span>Lead Explorer</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#181822] text-[#f95721] border border-[#262634]">
-              {leads.length} Records
+            <Building2 className="w-5 h-5 text-[#f95721]" />
+            <span>Manage Leads</span>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-[#181822] text-[#f95721] border border-[#262634]">
+              {totalCount} Saved
             </span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Search, filter by AI qualification status, manage outreach states, and inspect research evidence.
+            Review saved prospective companies, triage qualification statuses, track scheduled follow-ups, and inspect AI dossiers.
           </p>
         </div>
 
+        {/* CTA to Search Leads */}
         <button
-          onClick={onOpenDiscovery}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#f95721] hover:bg-[#ea4710] text-white text-xs font-semibold shadow-md shadow-[#f95721]/20 transition-all hover:scale-[1.01]"
+          onClick={onNavigateToSearch}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#f95721] to-[#ea4710] hover:brightness-110 text-white text-xs font-bold shadow-md shadow-[#f95721]/20 transition-all hover:scale-[1.01]"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Launch Discovery</span>
+          <Compass className="w-3.5 h-3.5" />
+          <span>Search New Leads</span>
         </button>
+      </div>
+
+      {/* Mini KPI Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 rounded-2xl bg-[#121217] border border-[#20202a]">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+            <span>Total Saved Leads</span>
+            <Layers className="w-3.5 h-3.5 text-slate-500" />
+          </div>
+          <div className="text-xl font-extrabold text-white mt-1">{totalCount}</div>
+        </div>
+
+        <div className="p-3.5 rounded-2xl bg-[#121217] border border-[#20202a]">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+            <span>Qualified Pipeline</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <div className="text-xl font-extrabold text-emerald-400 mt-1">{qualifiedCount}</div>
+        </div>
+
+        <div className="p-3.5 rounded-2xl bg-[#121217] border border-[#20202a]">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+            <span>Contacted</span>
+            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+          </div>
+          <div className="text-xl font-extrabold text-indigo-400 mt-1">{contactedCount}</div>
+        </div>
+
+        <div className={`p-3.5 rounded-2xl border transition-all ${
+          overdueCount > 0
+            ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+            : 'bg-[#121217] border-[#20202a] text-slate-400'
+        }`}>
+          <div className="text-[10px] font-bold uppercase tracking-wider flex items-center justify-between">
+            <span>Overdue Follow-ups</span>
+            <AlertTriangle className={`w-3.5 h-3.5 ${overdueCount > 0 ? 'text-amber-400' : 'text-slate-500'}`} />
+          </div>
+          <div className={`text-xl font-extrabold mt-1 ${overdueCount > 0 ? 'text-amber-400' : 'text-white'}`}>
+            {overdueCount}
+          </div>
+        </div>
       </div>
 
       {/* Filter and Search Bar Row */}
@@ -145,7 +238,7 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by company, website, industry, or location..."
+            placeholder="Search saved leads by company, website, industry, or location..."
             className="w-full bg-[#0c0c10] border border-[#22222e] rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#f95721] transition-colors"
           />
         </form>
@@ -177,7 +270,7 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
                 ? 'bg-amber-500 text-black shadow-sm font-bold'
                 : 'bg-[#0c0c10] text-amber-400 hover:text-amber-300 border border-amber-500/30'
             }`}
-            title="Filter overdue follow-ups"
+            title="Filter overdue follow-ups (FR-09)"
           >
             <AlertTriangle className="w-3 h-3" />
             <span>Overdue</span>
@@ -199,27 +292,27 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
         {loading && leads.length === 0 ? (
           <div className="py-20 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
             <RefreshCw className="w-5 h-5 animate-spin text-[#f95721]" />
-            <span>Loading prospective leads...</span>
+            <span>Loading saved leads...</span>
           </div>
         ) : error ? (
           <div className="py-12 text-center text-xs text-red-400">
             {error}
           </div>
-        ) : leads.length === 0 ? (
+        ) : sortedLeads.length === 0 ? (
           <div className="py-20 text-center max-w-md mx-auto space-y-3">
             <div className="h-12 w-12 rounded-2xl bg-[#181822] mx-auto flex items-center justify-center text-slate-400">
               <Building2 className="w-6 h-6 text-[#f95721]" />
             </div>
-            <h3 className="text-sm font-semibold text-white">No leads match your filter</h3>
+            <h3 className="text-sm font-semibold text-white">No saved leads match your filter</h3>
             <p className="text-xs text-slate-400">
-              Try adjusting your search query, or launch an automated discovery run to crawl fresh B2B companies.
+              Try adjusting your filter, or launch a discovery search to hunt for new B2B prospects.
             </p>
             <button
-              onClick={onOpenDiscovery}
+              onClick={onNavigateToSearch}
               className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#f95721] hover:bg-[#ea4710] text-white text-xs font-semibold shadow-md shadow-[#f95721]/20"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Launch Lead Discovery</span>
+              <Compass className="w-3.5 h-3.5" />
+              <span>Go to Search Leads</span>
             </button>
           </div>
         ) : (
@@ -227,16 +320,40 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
             <table className="w-full text-left text-xs">
               <thead className="bg-[#0c0c10] text-slate-400 border-b border-[#202028] uppercase tracking-wider text-[10px]">
                 <tr>
-                  <th className="py-3.5 px-4 font-semibold">Company & Domain</th>
+                  <th
+                    className="py-3.5 px-4 font-semibold cursor-pointer hover:text-white"
+                    onClick={() => handleSortToggle('name')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Company & Domain</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
                   <th className="py-3.5 px-4 font-semibold">Industry & Location</th>
-                  <th className="py-3.5 px-4 font-semibold text-center">AI Fit Score</th>
+                  <th
+                    className="py-3.5 px-4 font-semibold text-center cursor-pointer hover:text-white"
+                    onClick={() => handleSortToggle('score')}
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>AI Fit Score</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
                   <th className="py-3.5 px-4 font-semibold">Status</th>
-                  <th className="py-3.5 px-4 font-semibold">Follow-up</th>
+                  <th
+                    className="py-3.5 px-4 font-semibold cursor-pointer hover:text-white"
+                    onClick={() => handleSortToggle('date')}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Follow-up</span>
+                      <ArrowUpDown className="w-3 h-3 text-slate-500" />
+                    </div>
+                  </th>
                   <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1e1e28]">
-                {leads.map((lead) => (
+                {sortedLeads.map((lead) => (
                   <tr
                     key={lead.id}
                     onClick={() => onSelectLead(lead.id)}
@@ -303,9 +420,16 @@ export const LeadExplorerView: React.FC<LeadExplorerViewProps> = ({
                     {/* Follow-up status */}
                     <td className="py-3.5 px-4 text-slate-400 text-[11px]">
                       {(lead as any).follow_up_date ? (
-                        <div className="flex items-center gap-1 text-slate-300">
+                        <div className={`flex items-center gap-1 font-semibold ${
+                          (lead as any).is_overdue ? 'text-amber-400' : 'text-slate-300'
+                        }`}>
                           <Calendar className="w-3 h-3 text-amber-400" />
                           <span>{new Date((lead as any).follow_up_date).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                          {(lead as any).is_overdue && (
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              Overdue
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-600">—</span>

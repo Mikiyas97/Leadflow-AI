@@ -177,11 +177,6 @@ export const ChatbotUI: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleResetChat = () => {
-    setMessages([]);
-    setInput('');
-  };
-
   const toggleResearch = (leadId: number) => {
     setExpandedResearch((prev) => ({
       ...prev,
@@ -312,11 +307,11 @@ export const ChatbotUI: React.FC = () => {
                 follow_up_notes: `Initial follow-up scheduled following confirmed email dispatch to ${res.recipient}.`,
                 draft: l.draft
                   ? {
-                      ...l.draft,
-                      status: 'SENT',
-                      sent_at: res.sent_at,
-                      send_error: null,
-                    }
+                    ...l.draft,
+                    status: 'SENT',
+                    sent_at: res.sent_at,
+                    send_error: null,
+                  }
                   : null,
               };
             }),
@@ -330,10 +325,10 @@ export const ChatbotUI: React.FC = () => {
       setSendModal((prev) =>
         prev
           ? {
-              ...prev,
-              isSending: false,
-              sendError: err.message || 'SMTP send failed. Please verify credentials.',
-            }
+            ...prev,
+            isSending: false,
+            sendError: err.message || 'SMTP send failed. Please verify credentials.',
+          }
           : null
       );
     }
@@ -414,74 +409,6 @@ export const ChatbotUI: React.FC = () => {
 
   return (
     <div className="relative min-h-screen bg-[#080809] bg-grid-lines text-slate-100 flex flex-col font-sans selection:bg-[#f95721] selection:text-white">
-      {/* Top Header */}
-      <header className="border-b border-[#1c1c1f] bg-[#0c0c0e]/90 backdrop-blur sticky top-0 z-30 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          {/* Brand */}
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-[#f95721] to-[#ff7d47] flex items-center justify-center text-white shadow-md shadow-[#f95721]/20">
-              <Flame className="w-4 h-4 fill-current" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm tracking-tight text-white">LeadFlow AI</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#f95721]/15 text-[#f95721] border border-[#f95721]/30">
-                  Sales Ops Agent
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 hidden sm:block">
-                Firecrawl • Gemini API • Hunter.io • Gmail SMTP
-              </p>
-            </div>
-          </div>
-
-          {/* Right Controls */}
-          <div className="flex items-center gap-2">
-            {/* Test SMTP Trigger */}
-            <button
-              onClick={() => {
-                setIsTestSmtpOpen(true);
-                setTestEmailFeedback(null);
-              }}
-              className="px-2.5 py-1.5 rounded-lg bg-[#141418] hover:bg-[#1c1c22] border border-[#272732] hover:border-[#383848] text-slate-300 hover:text-white transition-all text-xs flex items-center gap-1.5 group"
-              title="Test Gmail SMTP connection"
-            >
-              <KeyRound className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">Test SMTP</span>
-            </button>
-
-            {/* Activity Log Button */}
-            <button
-              onClick={() => {
-                setIsActivityDrawerOpen(true);
-                loadActivityLogs();
-              }}
-              className="px-2.5 py-1.5 rounded-lg bg-[#141418] hover:bg-[#1c1c22] border border-[#272732] hover:border-[#383848] text-slate-300 hover:text-white transition-all text-xs flex items-center gap-1.5 group"
-              title="Open Activity Audit Trail"
-            >
-              <History className="w-3.5 h-3.5 text-[#f95721] group-hover:rotate-12 transition-transform" />
-              <span>Activity Log</span>
-              {activityLogs.length > 0 && (
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[#f95721]/20 text-[#f95721]">
-                  {activityLogs.length}
-                </span>
-              )}
-            </button>
-
-            {messages.length > 0 && (
-              <button
-                onClick={handleResetChat}
-                title="Clear conversation"
-                className="px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-[#18181b] transition-colors text-xs flex items-center gap-1.5 border border-transparent hover:border-[#272732]"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>New Run</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
       {/* Main Chat Interface */}
       <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 flex flex-col justify-between">
         {/* Messages Feed or Empty State */}
@@ -593,11 +520,10 @@ export const ChatbotUI: React.FC = () => {
                   )}
 
                   <div
-                    className={`relative w-full ${isUser ? 'max-w-xl' : 'max-w-3xl'} px-4 py-3.5 rounded-2xl text-xs leading-relaxed ${
-                      isUser
+                    className={`relative w-full ${isUser ? 'max-w-xl' : 'max-w-3xl'} px-4 py-3.5 rounded-2xl text-xs leading-relaxed ${isUser
                         ? 'bg-[#1c1c24] text-slate-100 border border-[#2d2d38] rounded-tr-sm shadow-md'
                         : 'bg-[#121216] text-slate-200 border border-[#24242e] rounded-tl-sm shadow-md'
-                    }`}
+                      }`}
                   >
                     {/* Content text */}
                     <div className="whitespace-pre-wrap font-sans space-y-2 text-slate-200 leading-relaxed">
@@ -1571,11 +1497,10 @@ export const ChatbotUI: React.FC = () => {
 
               {testEmailFeedback && (
                 <div
-                  className={`p-3 rounded-xl border text-[11px] leading-relaxed ${
-                    testEmailFeedback.success
+                  className={`p-3 rounded-xl border text-[11px] leading-relaxed ${testEmailFeedback.success
                       ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300'
                       : 'bg-rose-950/30 border-rose-900/50 text-rose-300'
-                  }`}
+                    }`}
                 >
                   <div className="font-bold flex items-center gap-1.5 mb-1">
                     {testEmailFeedback.success ? (
@@ -1674,13 +1599,12 @@ export const ChatbotUI: React.FC = () => {
                     >
                       <div className="flex items-center justify-between text-[10px]">
                         <span
-                          className={`font-bold px-1.5 py-0.5 rounded ${
-                            isSuccess
+                          className={`font-bold px-1.5 py-0.5 rounded ${isSuccess
                               ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
                               : isWarning
-                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
-                              : 'bg-blue-500/15 text-blue-400 border border-blue-500/25'
-                          }`}
+                                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+                                : 'bg-blue-500/15 text-blue-400 border border-blue-500/25'
+                            }`}
                         >
                           {log.action}
                         </span>
