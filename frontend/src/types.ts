@@ -1,8 +1,41 @@
+export interface PipelineContact {
+  id?: number | null;
+  name: string;
+  job_title?: string | null;
+  email?: string | null;
+  email_status: string;
+  confidence_score?: number | null;
+}
+
+export interface PipelineDraft {
+  id: number;
+  subject: string;
+  body: string;
+  status: 'DRAFT' | 'APPROVED' | 'REJECTED';
+  approved_at?: string | null;
+}
+
+export interface PipelineLead {
+  id: number;
+  company_name: string;
+  website: string;
+  industry?: string | null;
+  location?: string | null;
+  fit_score: number;
+  fit_reason?: string | null;
+  fit_strengths?: string[];
+  research_summary?: string | null;
+  contacts: PipelineContact[];
+  draft?: PipelineDraft | null;
+  follow_up_date?: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
+  pipeline_leads?: PipelineLead[] | null;
 }
 
 export interface TargetProfile {

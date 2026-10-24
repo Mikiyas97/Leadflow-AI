@@ -7,13 +7,18 @@ import {
   Copy,
   Check,
   Paperclip,
-  Sparkles
+  Sparkles,
+  ExternalLink,
+  Mail,
+  CheckCircle2,
+  Calendar,
+  ShieldCheck
 } from 'lucide-react';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, PipelineLead } from '../types';
 import { api } from '../services/api';
 
 const QUICK_PROMPTS = [
-  "Find B2B SaaS startups in the US with 20-100 employees",
+  "SaaS companies in the United States that may need AI automation",
   "Research Stripe's value proposition and target customer fit",
   "Find executive contacts and emails for Linear.app",
   "Draft a consultative cold email for a Head of Sales",
@@ -24,6 +29,12 @@ export const ChatbotUI: React.FC = () => {
   const [input, setInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // In-chat editing state for outreach drafts
+  const [editingDraftId, setEditingDraftId] = useState<number | null>(null);
+  const [editSubject, setEditSubject] = useState<string>('');
+  const [editBody, setEditBody] = useState<string>('');
+  const [isSavingDraft, setIsSavingDraft] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -64,6 +75,7 @@ export const ChatbotUI: React.FC = () => {
         role: 'assistant',
         content: response.content,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        pipeline_leads: response.pipeline_leads as PipelineLead[] | undefined,
       };
 
       setMessages((prev) => [...prev, agentMessage]);
@@ -71,7 +83,7 @@ export const ChatbotUI: React.FC = () => {
       const errorMessage: ChatMessage = {
         id: `err-${Date.now()}`,
         role: 'assistant',
-        content: `Connection error: ${err.message || 'Agent backend unavailable'}. Please check that the server is running.`,
+        content: `Connection error: ${err.message || 'Agent backend unavailable'}. Please verify that the server is running.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -97,6 +109,77 @@ export const ChatbotUI: React.FC = () => {
   const handleResetChat = () => {
     setMessages([]);
     setInput('');
+  };
+
+  const handleStartEditDraft = (draft: { id: number; subject: string; body: string }) => {
+    setEditingDraftId(draft.id);
+    setEditSubject(draft.subject);
+    setEditBody(draft.body);
+  };
+
+  const handleSaveDraftEdit = async (messageId: string, leadId: number, draftId: number) => {
+    try {
+      setIsSavingDraft(true);
+      await api.updateDraft(draftId, {
+        subject: editSubject,
+        body: editBody,
+      });
+
+      // Update message state
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId || !msg.pipeline_leads) return msg;
+          return {
+            ...msg,
+            pipeline_leads: msg.pipeline_leads.map((l) => {
+              if (l.id !== leadId || !l.draft) return l;
+              return {
+                ...l,
+                draft: {
+                  ...l.draft,
+                  subject: editSubject,
+                  body: editBody,
+                },
+              };
+            }),
+          };
+        })
+      );
+      setEditingDraftId(null);
+    } catch (err: any) {
+      alert(`Could not save draft: ${err.message}`);
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const handleApproveDraft = async (messageId: string, leadId: number, draftId: number) => {
+    try {
+      await api.approveDraft(draftId);
+
+      // Update message state in-place
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== messageId || !msg.pipeline_leads) return msg;
+          return {
+            ...msg,
+            pipeline_leads: msg.pipeline_leads.map((l) => {
+              if (l.id !== leadId || !l.draft) return l;
+              return {
+                ...l,
+                draft: {
+                  ...l.draft,
+                  status: 'APPROVED',
+                  approved_at: new Date().toISOString(),
+                },
+              };
+            }),
+          };
+        })
+      );
+    } catch (err: any) {
+      alert(`Could not approve draft: ${err.message}`);
+    }
   };
 
   return (
@@ -140,9 +223,9 @@ export const ChatbotUI: React.FC = () => {
       <div className="flex-1 max-w-3xl w-full mx-auto px-4 py-6 flex flex-col justify-between">
         
         {/* Messages Feed or Empty State */}
-        <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1 min-h-[50vh]">
+        <div className="flex-1 overflow-y-auto space-y-5 mb-6 pr-1 min-h-[50vh]">
           {messages.length === 0 ? (
-            /* Empty State: Focused on Starting */
+            /* Empty State */
             <div className="h-full flex flex-col items-center justify-center text-center py-12 animate-fade-in">
               <div className="h-12 w-12 rounded-2xl bg-[#f95721]/15 border border-[#f95721]/30 flex items-center justify-center text-[#f95721] mb-4 shadow-lg shadow-[#f95721]/10">
                 <Flame className="w-6 h-6 fill-current" />
@@ -151,7 +234,7 @@ export const ChatbotUI: React.FC = () => {
                 How can LeadFlow AI help you today?
               </h1>
               <p className="text-xs text-slate-400 mt-1.5 max-w-md">
-                Ask about B2B company research, discovering target prospects, verifying contacts, or crafting consultative outreach emails.
+                Enter your target market criteria to autonomously discover companies, scrape websites via Firecrawl, score customer fit with Gemini, and draft personalized outreach.
               </p>
 
               {/* Starter Prompt Suggestions */}
@@ -184,16 +267,204 @@ export const ChatbotUI: React.FC = () => {
                   )}
 
                   <div
-                    className={`relative max-w-2xl px-4 py-3 rounded-2xl text-xs leading-relaxed ${
+                    className={`relative w-full max-w-2xl px-4 py-3.5 rounded-2xl text-xs leading-relaxed ${
                       isUser
                         ? 'bg-[#1e1e24] text-slate-100 border border-[#2d2d38] rounded-tr-sm shadow-sm'
                         : 'bg-[#121215] text-slate-200 border border-[#24242c] rounded-tl-sm shadow-sm'
                     }`}
                   >
+                    {/* Content text */}
                     <div className="whitespace-pre-wrap font-sans space-y-2">
                       {msg.content}
                     </div>
 
+                    {/* Step 2-8: In-Chat Pipeline Lead Cards */}
+                    {msg.pipeline_leads && msg.pipeline_leads.length > 0 && (
+                      <div className="mt-4 space-y-4 pt-3 border-t border-[#22222a]">
+                        {msg.pipeline_leads.map((lead, idx) => {
+                          const isApproved = lead.draft?.status === 'APPROVED';
+                          const isEditing = editingDraftId === lead.draft?.id;
+
+                          return (
+                            <div
+                              key={lead.id}
+                              className="rounded-xl bg-[#16161b] border border-[#292934] p-4 space-y-3 shadow-md"
+                            >
+                              {/* Step 2: Company Discovery Header */}
+                              <div className="flex items-start justify-between gap-2 border-b border-[#252530] pb-2.5">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f95721]/20 text-[#f95721]">
+                                      PROSPECT #{idx + 1}
+                                    </span>
+                                    <h3 className="text-sm font-bold text-white">
+                                      {lead.company_name}
+                                    </h3>
+                                  </div>
+                                  <a
+                                    href={`https://${lead.website}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-[#f95721] hover:underline mt-0.5"
+                                  >
+                                    <span>{lead.website}</span>
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </div>
+
+                                {/* Step 4: Gemini Fit Score Badge */}
+                                <div className="text-right">
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                                    <Sparkles className="w-3 h-3" />
+                                    {lead.fit_score}/100 QUALIFIED
+                                  </span>
+                                  <div className="text-[10px] text-slate-500 mt-0.5">
+                                    {lead.location || 'United States'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Step 3: Firecrawl Research Profile */}
+                              <div className="bg-[#101013] rounded-lg p-2.5 border border-[#202028] text-[11px] text-slate-300 space-y-1">
+                                <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
+                                  <Flame className="w-3 h-3 text-[#f95721]" />
+                                  <span>Step 3 • Firecrawl Website Research</span>
+                                </div>
+                                <p className="line-clamp-2 text-slate-300">
+                                  {lead.research_summary}
+                                </p>
+                              </div>
+
+                              {/* Step 4: Gemini Suitability Reasoning */}
+                              {lead.fit_reason && (
+                                <div className="text-[11px] text-slate-300">
+                                  <span className="font-semibold text-slate-200">Gemini Fit Assessment: </span>
+                                  {lead.fit_reason}
+                                </div>
+                              )}
+
+                              {/* Step 5: Hunter.io Contacts */}
+                              {lead.contacts && lead.contacts.length > 0 && (
+                                <div className="bg-[#101013] rounded-lg p-2.5 border border-[#202028] space-y-1 text-[11px]">
+                                  <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
+                                    <User className="w-3 h-3 text-brand-orange" />
+                                    <span>Step 5 • Hunter.io Discovered Decision-Maker</span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center justify-between gap-1 text-slate-200">
+                                    <div>
+                                      <strong>{lead.contacts[0].name}</strong>
+                                      <span className="text-slate-400"> — {lead.contacts[0].job_title || 'Executive'}</span>
+                                    </div>
+                                    <span className="text-[10px] font-mono bg-[#1a1a22] px-2 py-0.5 rounded text-emerald-400 border border-emerald-500/20">
+                                      {lead.contacts[0].email} ({lead.contacts[0].confidence_score || 90}% confidence)
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Step 6: Gemini Outreach Email Draft */}
+                              {lead.draft && (
+                                <div className="bg-[#0e0e11] rounded-xl p-3 border border-[#22222a] space-y-2">
+                                  <div className="flex items-center justify-between text-[11px]">
+                                    <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                                      <Mail className="w-3.5 h-3.5 text-[#f95721]" />
+                                      <span>Step 6 • Gemini Personalized Introduction Email</span>
+                                    </div>
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                        isApproved
+                                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25'
+                                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/25'
+                                      }`}
+                                    >
+                                      {lead.draft.status}
+                                    </span>
+                                  </div>
+
+                                  {isEditing ? (
+                                    <div className="space-y-2 mt-2">
+                                      <input
+                                        type="text"
+                                        value={editSubject}
+                                        onChange={(e) => setEditSubject(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#181820] border border-[#2b2b36] text-xs text-white"
+                                      />
+                                      <textarea
+                                        rows={4}
+                                        value={editBody}
+                                        onChange={(e) => setEditBody(e.target.value)}
+                                        className="w-full p-2.5 rounded-lg bg-[#181820] border border-[#2b2b36] text-xs text-white font-mono leading-relaxed"
+                                      />
+                                      <div className="flex justify-end gap-2">
+                                        <button
+                                          onClick={() => setEditingDraftId(null)}
+                                          className="px-2.5 py-1 rounded text-[11px] text-slate-400 hover:text-white"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          onClick={() => handleSaveDraftEdit(msg.id, lead.id, lead.draft!.id)}
+                                          disabled={isSavingDraft}
+                                          className="px-3 py-1 rounded bg-[#f95721] text-white text-[11px] font-semibold"
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-1.5">
+                                      <div className="text-xs font-semibold text-white">
+                                        Subject: {lead.draft.subject}
+                                      </div>
+                                      <div className="p-2.5 rounded-lg bg-[#141418] border border-[#1e1e24] text-[11px] text-slate-300 font-sans whitespace-pre-wrap leading-relaxed">
+                                        {lead.draft.body}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Step 7 & 8: Human Approval and Follow-Up Management */}
+                                  <div className="mt-2.5 pt-2 border-t border-[#1e1e26] flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                                      <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                      <span>Step 8 • Next follow-up: <strong className="text-slate-200">{lead.follow_up_date || 'Oct 27, 2026'}</strong></span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      {!isApproved ? (
+                                        <>
+                                          <button
+                                            onClick={() => handleStartEditDraft(lead.draft!)}
+                                            className="px-2.5 py-1 rounded-lg bg-[#1e1e26] hover:bg-[#252530] text-slate-300 text-[11px] border border-[#2a2a38] transition-colors"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            onClick={() => handleApproveDraft(msg.id, lead.id, lead.draft!.id)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] shadow-sm transition-all"
+                                          >
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                            <span>Approve Outreach</span>
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/25">
+                                          <ShieldCheck className="w-3.5 h-3.5" />
+                                          Approved for Outreach (Follow-up: {lead.follow_up_date})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                </div>
+                              )}
+
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Timestamp & Copy */}
                     <div className="mt-2 pt-1 border-t border-[#22222a]/50 flex items-center justify-between text-[10px] text-slate-500">
                       <span>{msg.timestamp}</span>
                       <button
@@ -234,7 +505,7 @@ export const ChatbotUI: React.FC = () => {
               </div>
               <div className="px-4 py-3 rounded-2xl bg-[#121215] border border-[#24242c] rounded-tl-sm text-xs text-slate-400 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-[#f95721] animate-ping" />
-                <span>Agent is generating response...</span>
+                <span>Executing 8-step prospecting & qualification pipeline...</span>
               </div>
             </div>
           )}
@@ -252,7 +523,7 @@ export const ChatbotUI: React.FC = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask LeadFlow AI to find leads, research a company, or draft an email..."
+            placeholder="E.g. SaaS companies in the United States that may need AI automation..."
             className="w-full bg-transparent text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none leading-relaxed"
           />
 
@@ -274,7 +545,7 @@ export const ChatbotUI: React.FC = () => {
               disabled={isLoading || !input.trim()}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#f95721] hover:bg-[#ea4710] disabled:bg-[#f95721]/40 text-white text-xs font-semibold shadow-md shadow-[#f95721]/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed"
             >
-              <span>{isLoading ? 'Thinking...' : 'Send'}</span>
+              <span>{isLoading ? 'Processing Pipeline...' : 'Send'}</span>
               <Send className="w-3.5 h-3.5" />
             </button>
           </div>

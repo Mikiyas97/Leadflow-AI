@@ -39,7 +39,7 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 export const api = {
   // Chatbot
   sendChat: (messages: { role: string; content: string }[]) =>
-    request<{ role: string; content: string }>('/chat', {
+    request<{ role: string; content: string; pipeline_leads?: any[] }>('/chat', {
       method: 'POST',
       body: JSON.stringify({ messages }),
     }),
