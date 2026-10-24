@@ -81,4 +81,5 @@ def health_check():
         "gemini_configured": bool(settings.GEMINI_API_KEY),
         "hunter_configured": bool(settings.HUNTER_API_KEY),
         "firecrawl_configured": bool(settings.FIRECRAWL_API_KEY),
+        "serper_configured": bool(settings.SERPER_API_KEY),
     }

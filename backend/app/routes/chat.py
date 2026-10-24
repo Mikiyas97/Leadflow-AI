@@ -407,8 +407,23 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
 
             # --- STRICT GATE: ONLY PROCEED IF QUALIFIED ---
             if is_qualified:
-                # Step 5: Hunter.io contact discovery
-                raw_contacts = await hunter_service.search_domain(website, limit=2)
+                # Step 5: Hunter.io contact discovery & verification (Prioritizing Decision-Makers)
+                raw_contacts = await hunter_service.search_domain(website, limit=3)
+
+                # If named person identified from company search/research, use Hunter Email Finder
+                named_person = cand.get("contact_name")
+                if named_person and not any(named_person.lower() in (c.get("name") or "").lower() for c in raw_contacts):
+                    finder_contact = await hunter_service.find_email(domain=website, full_name=named_person, company=company_name)
+                    if finder_contact:
+                        raw_contacts.insert(0, finder_contact)
+
+                # Check deliverability via Hunter Email Verifier
+                for rc in raw_contacts:
+                    if rc.get("email") and hunter_service.is_configured():
+                        verify_res = await hunter_service.verify_email(rc["email"])
+                        if verify_res.get("status") in ("deliverable", "risky", "undeliverable"):
+                            rc["email_status"] = verify_res["status"]
+
                 for rc in raw_contacts:
                     contact = Contact(
                         lead_id=lead.id,

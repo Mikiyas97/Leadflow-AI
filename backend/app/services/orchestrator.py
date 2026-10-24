@@ -176,8 +176,23 @@ async def execute_discovery_run(run_id: int):
                 db.commit()
                 continue
 
-            # Step 4: Contact Discovery via Hunter.io
-            raw_contacts = await hunter_service.search_domain(website)
+            # Step 5: Contact Discovery via Hunter.io (Prioritizing Decision-Makers)
+            raw_contacts = await hunter_service.search_domain(website, limit=3)
+
+            # If specific contact identified from search / research, use Email Finder
+            named_person = cand.get("contact_name")
+            if named_person and not any(named_person.lower() in (c.get("name") or "").lower() for c in raw_contacts):
+                finder_contact = await hunter_service.find_email(domain=website, full_name=named_person, company=company_name)
+                if finder_contact:
+                    raw_contacts.insert(0, finder_contact)
+
+            # Check deliverability via Hunter Email Verifier
+            for rc in raw_contacts:
+                if rc.get("email") and hunter_service.is_configured():
+                    verify_res = await hunter_service.verify_email(rc["email"])
+                    if verify_res.get("status") in ("deliverable", "risky", "undeliverable"):
+                        rc["email_status"] = verify_res["status"]
+
             saved_contacts = []
             for c in raw_contacts:
                 contact = Contact(

@@ -4,6 +4,7 @@ import re
 from typing import List, Dict, Any, Optional
 
 from backend.app.services.firecrawl_service import firecrawl_service
+from backend.app.services.serper_service import serper_service
 
 logger = logging.getLogger("leadflow.discovery")
 
@@ -168,22 +169,20 @@ class DiscoveryService:
         else:
             search_query = f'{industry} companies in {location}'
 
-        search_results = await firecrawl_service.search_web(search_query, limit=limit * 2)
-
+        # Step 3: Google Search API (Serper.dev) when configured, or Firecrawl fallback
         candidates_found = []
 
-        if search_results:
-            for item in search_results:
+        if serper_service.is_configured():
+            logger.info(f"Using Serper.dev Google Search API for: '{search_query}'")
+            serper_results = await serper_service.search_google(search_query, num=limit * 2)
+            for item in serper_results:
                 title = item.get("title", "")
-                url = item.get("url", "")
-                desc = item.get("description", "")
-                content = item.get("content", "")
+                url = item.get("link", "")
+                desc = item.get("snippet", "")
+                sitelinks = item.get("sitelinks", [])
 
-                # 1. Check if the page is a directory listing containing multiple businesses (e.g. TripAdvisor, TechBehemoths)
                 if any(dir_kw in url.lower() for dir_kw in ["tripadvisor", "techbehemoths", "tracxn", "yellowpages", "momondo"]):
-                    # Extract individual business names from directory snippet/content
-                    # E.g. "Kuriftu Resort & Spa", "Renaissance Hotel", "Orbit Health", "Zalatechs"
-                    extracted_names = self._extract_names_from_directory(content or desc, industry)
+                    extracted_names = self._extract_names_from_directory(desc, industry)
                     for name in extracted_names:
                         clean_id = self.clean_website(f"{name.lower().replace(' ', '')}.local")
                         if clean_id not in excluded_set and not any(c["company_name"].lower() == name.lower() for c in candidates_found):
@@ -191,10 +190,10 @@ class DiscoveryService:
                                 "company_name": name,
                                 "raw_url": url,
                                 "description": f"Directory listing for {name} in {location}",
-                                "source_url": url
+                                "source_url": url,
+                                "relevant_pages": [sl["link"] for sl in sitelinks if sl.get("link")]
                             })
                 else:
-                    # Individual company website or article
                     company_name = title.split(" - ")[0].split(" | ")[0].split(" – ")[0].split(":")[0].strip()
                     domain = self.clean_website(url)
                     if domain and domain not in excluded_set and not any(c["company_name"].lower() == company_name.lower() for c in candidates_found):
@@ -202,8 +201,41 @@ class DiscoveryService:
                             "company_name": company_name,
                             "raw_url": url,
                             "description": desc or title,
-                            "source_url": url
+                            "source_url": url,
+                            "relevant_pages": [sl["link"] for sl in sitelinks if sl.get("link")]
                         })
+
+        # Fallback to Firecrawl search if Serper not configured or zero candidates
+        if not candidates_found:
+            search_results = await firecrawl_service.search_web(search_query, limit=limit * 2)
+            if search_results:
+                for item in search_results:
+                    title = item.get("title", "")
+                    url = item.get("url", "")
+                    desc = item.get("description", "")
+                    content = item.get("content", "")
+
+                    if any(dir_kw in url.lower() for dir_kw in ["tripadvisor", "techbehemoths", "tracxn", "yellowpages", "momondo"]):
+                        extracted_names = self._extract_names_from_directory(content or desc, industry)
+                        for name in extracted_names:
+                            clean_id = self.clean_website(f"{name.lower().replace(' ', '')}.local")
+                            if clean_id not in excluded_set and not any(c["company_name"].lower() == name.lower() for c in candidates_found):
+                                candidates_found.append({
+                                    "company_name": name,
+                                    "raw_url": url,
+                                    "description": f"Directory listing for {name} in {location}",
+                                    "source_url": url
+                                })
+                    else:
+                        company_name = title.split(" - ")[0].split(" | ")[0].split(" – ")[0].split(":")[0].strip()
+                        domain = self.clean_website(url)
+                        if domain and domain not in excluded_set and not any(c["company_name"].lower() == company_name.lower() for c in candidates_found):
+                            candidates_found.append({
+                                "company_name": company_name,
+                                "raw_url": url,
+                                "description": desc or title,
+                                "source_url": url
+                            })
 
         # Process candidates with website investigation
         for cand in candidates_found[:limit]:

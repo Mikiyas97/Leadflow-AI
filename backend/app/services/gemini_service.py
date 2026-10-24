@@ -28,6 +28,75 @@ class GeminiService:
     def is_configured(self) -> bool:
         return bool(self.api_key and self.client)
 
+    def optimize_search_target(self, user_prompt: str) -> Dict[str, Any]:
+        """
+        Step 2: Uses Gemini to turn user request into targeted Google search queries,
+        industries, locations, qualification criteria, and target decision-makers.
+        """
+        if self.is_configured():
+            try:
+                system_instruction = (
+                    "You are a B2B search optimization specialist. "
+                    "Analyze the user's prospecting target and return a clean JSON object with: "
+                    "'search_queries': list of 2-3 specific Google search query strings for finding matching company official websites, "
+                    "'industry': primary industry category, "
+                    "'location': target geographical region or city/country, "
+                    "'company_type': target company size or profile, "
+                    "'qualification_criteria': explicit criteria to evaluate prospect fit, "
+                    "'target_decision_makers': list of 2-3 target executive job titles."
+                )
+                prompt = f"{system_instruction}\n\nUser Request: {user_prompt}\n\nReturn strictly valid JSON only."
+                response = self.client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
+                )
+                parsed = json.loads(response.text.strip())
+                if isinstance(parsed, dict) and "search_queries" in parsed:
+                    return parsed
+            except Exception as e:
+                logger.warning(f"Gemini search optimization error: {e}. Using deterministic parsing.")
+
+        return self._deterministic_search_optimization(user_prompt)
+
+    def _deterministic_search_optimization(self, user_prompt: str) -> Dict[str, Any]:
+        lower = user_prompt.lower()
+        location = "United States"
+        if "addis ababa" in lower or "ethiopia" in lower:
+            location = "Addis Ababa, Ethiopia"
+        elif "kenya" in lower or "nairobi" in lower:
+            location = "Nairobi, Kenya"
+        elif "europe" in lower or "uk" in lower or "london" in lower:
+            location = "United Kingdom"
+        
+        industry = "B2B SaaS"
+        if "hotel" in lower or "hospitality" in lower:
+            industry = "Hospitality / Hotels"
+        elif "fintech" in lower:
+            industry = "FinTech"
+        elif "healthcare" in lower or "medical" in lower:
+            industry = "Healthcare"
+        elif "agency" in lower or "marketing" in lower:
+            industry = "Digital Marketing & Agencies"
+
+        queries = [
+            f"{industry} companies in {location}",
+            f"top {industry} organizations {location}"
+        ]
+
+        decision_makers = ["Founder", "CEO", "CTO", "Head of Operations"]
+        if "support" in lower:
+            decision_makers = ["Head of Customer Support", "VP Customer Success", "COO", "Founder"]
+
+        return {
+            "search_queries": queries,
+            "industry": industry,
+            "location": location,
+            "company_type": "Growth B2B Company",
+            "qualification_criteria": f"Active {industry} organization in {location} with business operational needs matching {user_prompt}",
+            "target_decision_makers": decision_makers
+        }
+
     def analyze_lead_suitability(
         self,
         company_name: str,
@@ -194,7 +263,12 @@ Do not include markdown backticks or extra text outside the JSON.
         strengths = []
         risks = []
 
-        if target_industry and target_industry.lower() in summary_lower:
+        ind_matched = False
+        if target_industry:
+            t_ind = target_industry.lower()
+            ind_matched = t_ind in summary_lower or any(p in summary_lower for p in ["saas", "software", "tech", "hotel", "fintech", "health", "agency"] if p in t_ind)
+
+        if ind_matched:
             strengths.append(f"Profile confirms operations in {target_industry}")
             score += 25
         elif target_industry:
