@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   SlidersHorizontal,
-  Sparkles,
   MapPin,
   Building2,
   ChevronRight,
@@ -78,18 +77,6 @@ interface DiscoveredResultItem {
   contacts?: ContactItem[];
 }
 
-interface FormPreset {
-  title: string;
-  name: string;
-  location: string;
-  jobTitles: string[];
-  industries: string[];
-  companySizes: string[];
-  serviceOffered: string;
-  requireNoWebsite: boolean;
-  quantity: number;
-  tag: string;
-}
 
 // Available options for select dropdowns
 const AVAILABLE_JOB_TITLES = [
@@ -455,64 +442,6 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Form Presets
-  const formPresets: FormPreset[] = [
-    {
-      title: '⭐ Addis Ababa Commercial Giants (Screenshot)',
-      name: 'Addis Ababa Commercial Giants & Financial Institutions',
-      location: 'Addis Ababa, Ethiopia',
-      jobTitles: ['Chief Information Officer', 'IT Director', 'VP of IT', 'Chief Executive Officer'],
-      industries: ['Airlines and Aviation', 'Telecommunications', 'Financial Services', 'Banking', 'Research'],
-      companySizes: ['1,001–5,000', '5,001–10,000', '10,001+'],
-      serviceOffered: 'Enterprise Cloud Infrastructure, Cybersecurity & Workflow Automation',
-      requireNoWebsite: false,
-      quantity: 8,
-      tag: 'Addis Ababa'
-    },
-    {
-      title: 'IT Admins & Decision Makers (SMBs)',
-      name: 'IT Administrators and Business Decision Makers at SMBs',
-      location: 'United States',
-      jobTitles: [
-        'IT Director',
-        'IT Manager',
-        'Chief Information Officer',
-        'VP of IT',
-        'Head of IT',
-        'Director of Information Technology'
-      ],
-      industries: ['Software & Internet', 'Computers & Electronics', 'Business Services'],
-      companySizes: ['25 - 100', '100 - 250'],
-      serviceOffered: 'Enterprise IT Infrastructure, Cloud Management & Cybersecurity Automation',
-      requireNoWebsite: false,
-      quantity: 5,
-      tag: 'IT / SMB'
-    },
-    {
-      title: 'Addis Ababa Hotels (No Website)',
-      name: 'Addis Ababa Boutique Hotels & Lodges',
-      location: 'Addis Ababa, Ethiopia',
-      jobTitles: ['General Manager', 'Owner', 'Managing Director'],
-      industries: ['Hospitality'],
-      companySizes: ['1 - 25', '25 - 100'],
-      serviceOffered: 'Official Website & Digital Presence Development',
-      requireNoWebsite: true,
-      quantity: 5,
-      tag: 'Hospitality'
-    },
-    {
-      title: 'US B2B SaaS Startups',
-      name: 'High-Growth US B2B SaaS',
-      location: 'United States',
-      jobTitles: ['Founder & CEO', 'Chief Technology Officer', 'Head of IT'],
-      industries: ['Software & Internet'],
-      companySizes: ['25 - 100'],
-      serviceOffered: 'AI Customer Support Automation',
-      requireNoWebsite: false,
-      quantity: 5,
-      tag: 'B2B SaaS'
-    }
-  ];
 
   useEffect(() => {
     loadProfiles();
@@ -527,26 +456,6 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
     }
   };
 
-  const handleApplyPreset = (preset: FormPreset) => {
-    setPersonaName(preset.name);
-    setLocation(preset.location);
-    setSelectedJobTitles([...preset.jobTitles]);
-    setSelectedIndustries([...preset.industries]);
-    setSelectedCompanySizes([...preset.companySizes]);
-    setServiceOffered(preset.serviceOffered);
-    setRequireNoWebsite(preset.requireNoWebsite);
-    setQuantity(preset.quantity);
-    setSelectedProfileId('custom');
-    setOpenDropdown(null);
-    setErrorMessage(null);
-    setSaveSuccessMessage(null);
-
-    if (preset.title.includes('Addis Ababa Commercial Giants')) {
-      setSearchResults(SAMPLE_COMPANIES);
-      setInspectedLead(SAMPLE_COMPANIES[0]);
-      setSelectedLeadIds([]);
-    }
-  };
 
   const handleProfileChange = (val: string) => {
     if (val === 'custom') {
@@ -826,26 +735,6 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
         </button>
       </div>
 
-      {/* Compact Preset Form Templates */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1 mr-1">
-          <Sparkles className="w-3.5 h-3.5 text-[#f95721]" />
-          <span>Presets:</span>
-        </span>
-        {formPresets.map((preset, idx) => (
-          <button
-            key={idx}
-            type="button"
-            onClick={() => handleApplyPreset(preset)}
-            className="px-2.5 py-1 rounded-lg bg-[#111116] hover:bg-[#1a1a22] border border-[#22222e] hover:border-[#f95721]/50 text-slate-300 hover:text-white text-[11px] transition-colors flex items-center gap-1.5 shadow-sm"
-          >
-            <span className="font-semibold">{preset.title}</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#1c1c28] text-[#f95721] font-mono">
-              {preset.tag}
-            </span>
-          </button>
-        ))}
-      </div>
 
       {/* Saved Success Notification */}
       {saveSuccessMessage && (
