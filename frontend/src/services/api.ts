@@ -37,6 +37,13 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Chatbot
+  sendChat: (messages: { role: string; content: string }[]) =>
+    request<{ role: string; content: string }>('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    }),
+
   // Health
   checkHealth: () => request<{ status: string; database: string; gemini_configured: boolean; hunter_configured: boolean; firecrawl_configured: boolean }>('/health'),
 

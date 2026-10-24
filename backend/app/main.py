@@ -10,6 +10,7 @@ from backend.app.routes.leads import router as leads_router
 from backend.app.routes.drafts import router as drafts_router
 from backend.app.routes.activity import router as activity_router
 from backend.app.routes.dashboard import router as dashboard_router
+from backend.app.routes.chat import router as chat_router
 
 
 @asynccontextmanager
@@ -43,6 +44,7 @@ app.add_middleware(
 )
 
 # Register API Routers under /api
+app.include_router(chat_router, prefix=settings.API_V1_STR)
 app.include_router(profiles_router, prefix=settings.API_V1_STR)
 app.include_router(discovery_router, prefix=settings.API_V1_STR)
 app.include_router(leads_router, prefix=settings.API_V1_STR)

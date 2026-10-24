@@ -53,3 +53,17 @@ def test_draft_approval_workflow():
         approve_res = client.post(f"/api/drafts/{draft_id}/approve")
         assert approve_res.status_code == 200
         assert approve_res.json()["status"] == "APPROVED"
+
+
+def test_chat_endpoint():
+    payload = {
+        "messages": [
+            {"role": "user", "content": "How do I find high-fit B2B leads?"}
+        ]
+    }
+    response = client.post("/api/chat", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["role"] == "assistant"
+    assert len(data["content"]) > 0
+
