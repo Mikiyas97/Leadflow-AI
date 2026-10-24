@@ -43,10 +43,10 @@ interface SearchLeadsViewProps {
 
 interface ContactItem {
   name: string;
-  job_title: string;
-  email?: string;
-  email_status?: string;
-  confidence_score?: number;
+  job_title?: string | null;
+  email?: string | null;
+  email_status?: string | null;
+  confidence_score?: number | null;
   seniority?: 'Executive' | 'Management' | 'Staff';
   is_c_level?: boolean;
 }
@@ -95,20 +95,22 @@ const AVAILABLE_INDUSTRIES = [
   'Software & Internet',
   'Computers & Electronics',
   'Business Services',
-  'Airlines and Aviation',
-  'Telecommunications',
   'Financial Services',
-  'Banking',
-  'Research',
-  'Hospitality'
+  'Healthcare',
+  'Manufacturing',
+  'Retail & E-commerce',
+  'Education',
+  'Telecommunications'
 ];
 
 const AVAILABLE_LOCATIONS = [
-  'Addis Ababa, Ethiopia',
   'United States',
   'California, USA',
+  'New York, USA',
+  'Texas, USA',
   'United Kingdom',
   'Canada',
+  'European Union',
   'Remote / Global'
 ];
 
@@ -116,252 +118,11 @@ const AVAILABLE_SIZES = [
   '1 - 25',
   '25 - 100',
   '100 - 250',
-  '1,001–5,000',
-  '5,001–10,000',
-  '10,001+'
+  '250 - 1,000',
+  '1,001 - 5,000',
+  '5,001+'
 ];
 
-// Curated companies matching user's reference screenshots (Ethiopian commercial giants & enterprises)
-const SAMPLE_COMPANIES: DiscoveredResultItem[] = [
-  {
-    id: 101,
-    company_name: 'Ethiopian Airlines',
-    website: 'ethiopianairlines.com',
-    industry: 'Airlines and Aviation',
-    location: 'Addis Ababa, Adis Abeba, Ethiopia',
-    company_size: '10,001+ employees',
-    founded_year: '1946',
-    email_count: 3155,
-    people_count: 2909,
-    decision_maker_count: 66,
-    generic_count: 246,
-    description:
-      'Ethiopian Airlines is a leading airline that offers extensive passenger and cargo services across five continents while prioritizing comfort and sustainability.',
-    keywords: ['Commercial Aviation', 'Star Alliance', 'Air Cargo', 'Aviation Maintenance', 'Passenger Flights'],
-    fit_score: 95,
-    status: 'QUALIFIED',
-    website_status: 'HAS_OFFICIAL_WEBSITE',
-    fit_reason: 'Major pan-African airline with large-scale enterprise IT and ticketing operations.',
-    technologies: [
-      { name: 'Amazon Web Services (AWS)', category: 'Cloud Infrastructure' },
-      { name: 'Cloudflare', category: 'CDN & DNS' },
-      { name: 'Microsoft 365 Enterprise', category: 'Productivity & Email' },
-      { name: 'Amadeus Altéa', category: 'Passenger Reservation' },
-      { name: 'Oracle ERP', category: 'Enterprise Management' }
-    ],
-    signals: [
-      { type: 'Hiring', title: 'Hiring Senior Cloud Infrastructure Architects & Security Engineers', date: 'Oct 2026' },
-      { type: 'Expansion', title: 'Announced 15 new intercontinental routes and fleet modernization', date: 'Sep 2026' }
-    ],
-    contacts: [
-      { name: 'Mesfin Tasew', job_title: 'Chief Executive Officer', email: 'm.tasew@ethiopianairlines.com', email_status: 'verified', confidence_score: 98, seniority: 'Executive', is_c_level: true },
-      { name: 'Dawit Tadesse', job_title: 'Chief Information Officer', email: 'd.tadesse@ethiopianairlines.com', email_status: 'verified', confidence_score: 96, seniority: 'Executive', is_c_level: true },
-      { name: 'Lemma Yadecha', job_title: 'Chief Commercial Officer', email: 'l.yadecha@ethiopianairlines.com', email_status: 'verified', confidence_score: 94, seniority: 'Executive', is_c_level: true },
-      { name: 'Retta Melaku', job_title: 'VP of Customer Experience & Ground Operations', email: 'r.melaku@ethiopianairlines.com', email_status: 'verified', confidence_score: 91, seniority: 'Executive', is_c_level: true },
-      { name: 'Kassahun Terefe', job_title: 'VP of IT Systems & Network Infrastructure', email: 'k.terefe@ethiopianairlines.com', email_status: 'verified', confidence_score: 89, seniority: 'Executive', is_c_level: false },
-      { name: 'Solomon Bekele', job_title: 'IT Operations Director', email: 's.bekele@ethiopianairlines.com', email_status: 'verified', confidence_score: 87, seniority: 'Management', is_c_level: false }
-    ]
-  },
-  {
-    id: 102,
-    company_name: 'Ethio telecom',
-    website: 'ethiotelecom.et',
-    industry: 'Telecommunications',
-    location: 'Addis Ababa, Ethiopia',
-    company_size: '10,001+ employees',
-    founded_year: '1894',
-    email_count: 2520,
-    people_count: 2210,
-    decision_maker_count: 54,
-    generic_count: 256,
-    description:
-      'Ethio telecom is the primary integrated telecommunications provider in Ethiopia, driving national digital transformation with Telebirr, 5G networks, and enterprise cloud services.',
-    keywords: ['Telecommunications', 'Mobile Money', '5G Mobile Network', 'Broadband Internet', 'Cloud Hosting'],
-    fit_score: 92,
-    status: 'QUALIFIED',
-    website_status: 'HAS_OFFICIAL_WEBSITE',
-    fit_reason: 'National telecommunications provider managing telebirr and digital cloud services.',
-    technologies: [
-      { name: 'Huawei Cloud', category: 'Core Network' },
-      { name: 'ZTE 5G Core', category: 'Telecommunications' },
-      { name: 'Oracle Database', category: 'Database Systems' },
-      { name: 'F5 BIG-IP', category: 'Load Balancing & Security' }
-    ],
-    signals: [
-      { type: 'Hiring', title: 'Recruiting Enterprise Network Operations Center (NOC) Leaders', date: 'Oct 2026' },
-      { type: 'Launch', title: 'Surpassed 45 million registered Telebirr digital finance users', date: 'Aug 2026' }
-    ],
-    contacts: [
-      { name: 'Frehiwot Tamru', job_title: 'Chief Executive Officer', email: 'f.tamru@ethiotelecom.et', email_status: 'verified', confidence_score: 99, seniority: 'Executive', is_c_level: true },
-      { name: 'Solomon Wolde', job_title: 'Chief Information Officer', email: 's.wolde@ethiotelecom.et', email_status: 'verified', confidence_score: 96, seniority: 'Executive', is_c_level: true },
-      { name: 'Tewodros Worku', job_title: 'Chief Technology Officer', email: 't.worku@ethiotelecom.et', email_status: 'verified', confidence_score: 93, seniority: 'Executive', is_c_level: true }
-    ]
-  },
-  {
-    id: 103,
-    company_name: 'Addis Ababa University',
-    website: 'aau.edu.et',
-    industry: 'Research',
-    location: 'Addis Ababa, Ethiopia',
-    company_size: '1,001–5,000 employees',
-    founded_year: '1950',
-    email_count: 1536,
-    people_count: 1410,
-    decision_maker_count: 42,
-    generic_count: 84,
-    description:
-      'Addis Ababa University is the oldest and largest higher education and research institution in Ethiopia, recognized for its comprehensive academic faculties and clinical research.',
-    keywords: ['Higher Education', 'Academic Research', 'Postgraduate Studies', 'Scientific Innovation'],
-    fit_score: 85,
-    status: 'QUALIFIED',
-    website_status: 'HAS_OFFICIAL_WEBSITE',
-    fit_reason: 'National research institution with university-wide IT and academic cloud networks.',
-    technologies: [
-      { name: 'Moodle LMS', category: 'Learning Management' },
-      { name: 'Apache Web Server', category: 'Web Infrastructure' },
-      { name: 'Ubuntu Linux', category: 'Operating System' }
-    ],
-    signals: [
-      { type: 'Academic', title: 'Expanded autonomous research university governance framework', date: 'Oct 2026' }
-    ],
-    contacts: [
-      { name: 'Tassew Woldehanna', job_title: 'President & Research Director', email: 'tasseww@aau.edu.et', email_status: 'verified', confidence_score: 95, seniority: 'Executive', is_c_level: true },
-      { name: 'Yohannes Abebe', job_title: 'Director of ICT Operations', email: 'y.abebe@aau.edu.et', email_status: 'verified', confidence_score: 91, seniority: 'Executive', is_c_level: false }
-    ]
-  },
-  {
-    id: 104,
-    company_name: 'Bank of Abyssinia',
-    website: 'bankofabyssinia.com',
-    industry: 'Financial Services',
-    location: 'Addis Ababa, Ethiopia',
-    company_size: '5,001–10,000 employees',
-    founded_year: '1996',
-    email_count: 1057,
-    people_count: 960,
-    decision_maker_count: 38,
-    generic_count: 59,
-    description:
-      'Bank of Abyssinia is a leading commercial bank in Ethiopia offering cutting-edge omnichannel digital banking, agency banking, and international trade finance.',
-    keywords: ['Commercial Banking', 'Digital Payments', 'Trade Finance', 'Mobile Banking App', 'POS Terminals'],
-    fit_score: 90,
-    status: 'QUALIFIED',
-    website_status: 'HAS_OFFICIAL_WEBSITE',
-    fit_reason: 'Top private commercial bank expanding omnichannel digital banking and infrastructure.',
-    technologies: [
-      { name: 'Temenos T24', category: 'Core Banking' },
-      { name: 'Cisco Networking', category: 'Bank Infrastructure' },
-      { name: 'Microsoft SQL Server', category: 'Database Systems' }
-    ],
-    signals: [
-      { type: 'Hiring', title: 'Hiring Digital Banking Product Managers & Cyber Defense Analysts', date: 'Oct 2026' }
-    ],
-    contacts: [
-      { name: 'Bekalu Zeleke', job_title: 'Chief Executive Officer', email: 'bekaluz@bankofabyssinia.com', email_status: 'verified', confidence_score: 97, seniority: 'Executive', is_c_level: true },
-      { name: 'Daniel Hailu', job_title: 'VP of IT & Digital Banking', email: 'danielh@bankofabyssinia.com', email_status: 'verified', confidence_score: 94, seniority: 'Executive', is_c_level: true }
-    ]
-  },
-  {
-    id: 105,
-    company_name: 'Dashen Bank',
-    website: 'dashenbanksc.com',
-    industry: 'Banking',
-    location: 'Addis Ababa, Ethiopia',
-    company_size: '10,001+ employees',
-    founded_year: '1995',
-    email_count: 973,
-    people_count: 885,
-    decision_maker_count: 36,
-    generic_count: 52,
-    description:
-      'Dashen Bank is a premier private bank in Ethiopia known for pioneering payment solutions, modern credit management, and digital banking platforms.',
-    keywords: ['Retail Banking', 'Amole Digital Wallet', 'Corporate Credit', 'ATM Networks'],
-    fit_score: 89,
-    status: 'QUALIFIED',
-    website_status: 'HAS_OFFICIAL_WEBSITE',
-    fit_reason: 'Pioneering private bank operating nationwide electronic payment and enterprise CRM systems.',
-    technologies: [
-      { name: 'Oracle Flexcube', category: 'Core Banking' },
-      { name: 'IBM Security QRadar', category: 'SIEM & SOC' }
-    ],
-    signals: [
-      { type: 'Hiring', title: 'Recruiting Enterprise Integration Specialists', date: 'Oct 2026' }
-    ],
-    contacts: [
-      { name: 'Asfaw Alemu', job_title: 'Chief Executive Officer', email: 'asfawa@dashenbanksc.com', email_status: 'verified', confidence_score: 96, seniority: 'Executive', is_c_level: true },
-      { name: 'Berhanu Wolde', job_title: 'Chief Information Officer', email: 'berhanuw@dashenbanksc.com', email_status: 'verified', confidence_score: 92, seniority: 'Executive', is_c_level: true }
-    ]
-  },
-  {
-    id: 106,
-    company_name: 'Adigrat University',
-    website: 'adu.edu.et',
-    industry: 'Research & Education',
-    location: 'Addis Ababa, Ethiopia',
-    company_size: '1,001–5,000 employees',
-    founded_year: '2011',
-    email_count: 499,
-    people_count: 440,
-    decision_maker_count: 22,
-    generic_count: 37,
-    description:
-      'Adigrat University is a public higher learning institution offering undergraduate and graduate programs across multiple engineering and science faculties.',
-    keywords: ['Engineering Sciences', 'Higher Education', 'Research Liaison'],
-    fit_score: 80,
-    status: 'QUALIFIED',
-    website_status: 'HAS_OFFICIAL_WEBSITE',
-    fit_reason: 'Higher education institution maintaining regional research portals and staff directory.',
-    contacts: [
-      { name: 'Zaid Woldu', job_title: 'Director of IT Services', email: 'zaidw@adu.edu.et', email_status: 'verified', confidence_score: 88, seniority: 'Management', is_c_level: false }
-    ]
-  },
-  {
-    id: 107,
-    company_name: 'Awash Bank',
-    website: 'awashbank.com',
-    industry: 'Banking',
-    location: 'Addis Ababa, Ethiopia',
-    company_size: '10,001+ employees',
-    founded_year: '1994',
-    email_count: 453,
-    people_count: 412,
-    decision_maker_count: 18,
-    generic_count: 23,
-    description:
-      'Awash Bank is the largest private commercial bank in Ethiopia, offering extensive corporate and retail banking networks across the nation.',
-    keywords: ['Private Banking', 'Trade Finance', 'Microfinance', 'Digital Branches'],
-    fit_score: 91,
-    status: 'QUALIFIED',
-    website_status: 'HAS_OFFICIAL_WEBSITE',
-    fit_reason: 'Premier private commercial bank with extensive digital banking modernization initiatives.',
-    contacts: [
-      { name: 'Tsehay Shiferaw', job_title: 'Chief Executive Officer', email: 'tsehays@awashbank.com', email_status: 'verified', confidence_score: 97, seniority: 'Executive', is_c_level: true }
-    ]
-  },
-  {
-    id: 108,
-    company_name: 'United Nations Economic Commission for Africa',
-    website: 'uneca.org',
-    industry: 'International Affairs & Development',
-    location: 'Addis Ababa, Ethiopia',
-    company_size: '1,001–5,000 employees',
-    founded_year: '1958',
-    email_count: 380,
-    people_count: 345,
-    decision_maker_count: 16,
-    generic_count: 19,
-    description:
-      'The United Nations Economic Commission for Africa (UNECA) promotes economic and social development across its 54 member states from its headquarters at Africa Hall, Addis Ababa.',
-    keywords: ['Economic Policy', 'Pan-African Development', 'Diplomatic Mission', 'Policy Research'],
-    fit_score: 86,
-    status: 'QUALIFIED',
-    website_status: 'HAS_OFFICIAL_WEBSITE',
-    fit_reason: 'Continental United Nations diplomatic and regional policy development agency.',
-    contacts: [
-      { name: 'Claver Gatete', job_title: 'Executive Secretary', email: 'c.gatete@uneca.org', email_status: 'verified', confidence_score: 96, seniority: 'Executive', is_c_level: true }
-    ]
-  }
-];
 
 export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
   onSelectLead,
@@ -384,20 +145,18 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
   ]);
   const [customJobTitleInput, setCustomJobTitleInput] = useState<string>('');
 
-  const [location, setLocation] = useState<string>('Addis Ababa, Ethiopia');
+  const [location, setLocation] = useState<string>('United States');
 
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([
-    'Airlines and Aviation',
-    'Telecommunications',
-    'Financial Services',
-    'Banking',
-    'Research'
+    'Software & Internet',
+    'Computers & Electronics',
+    'Business Services'
   ]);
   const [customIndustryInput, setCustomIndustryInput] = useState<string>('');
 
   const [selectedCompanySizes, setSelectedCompanySizes] = useState<string[]>([
-    '5,001–10,000',
-    '10,001+'
+    '25 - 100',
+    '100 - 250'
   ]);
 
   const [serviceOffered, setServiceOffered] = useState<string>(
@@ -405,7 +164,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
   );
   const [requireNoWebsite, setRequireNoWebsite] = useState<boolean>(false);
   const [requireVerifiedEmail, setRequireVerifiedEmail] = useState<boolean>(true);
-  const [quantity, setQuantity] = useState<number>(8);
+  const [quantity, setQuantity] = useState<number>(5);
 
   // Dropdown open/close state for Choices.js style select inputs
   const [openDropdown, setOpenDropdown] = useState<'jobTitles' | 'industries' | 'location' | 'sizes' | null>(null);
@@ -414,11 +173,11 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
   // Search execution & selection states
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [activeStep, setActiveStep] = useState<number>(0);
-  const [searchResults, setSearchResults] = useState<DiscoveredResultItem[]>(SAMPLE_COMPANIES);
+  const [searchResults, setSearchResults] = useState<DiscoveredResultItem[]>([]);
   const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
   
   // In-page inspection state (matches the split view in the reference screenshot)
-  const [inspectedLead, setInspectedLead] = useState<DiscoveredResultItem | null>(SAMPLE_COMPANIES[0]);
+  const [inspectedLead, setInspectedLead] = useState<DiscoveredResultItem | null>(null);
   const [inspectorTab, setInspectorTab] = useState<'emails' | 'technologies' | 'signals'>('emails');
   const [contactSegment, setContactSegment] = useState<'people' | 'decision_makers' | 'generic'>('people');
   const [isExecutiveOpen, setIsExecutiveOpen] = useState<boolean>(true);
@@ -445,6 +204,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
 
   useEffect(() => {
     loadProfiles();
+    loadExistingLeads();
   }, []);
 
   const loadProfiles = async () => {
@@ -455,6 +215,75 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
       // ignore
     }
   };
+
+  const loadExistingLeads = async () => {
+    try {
+      const data = await api.getLeads();
+      if (data && data.length > 0) {
+        setSearchResults(data);
+        setInspectedLead(data[0]);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleInspectLead = async (lead: DiscoveredResultItem) => {
+    setInspectedLead(lead);
+    if (!lead.contacts || lead.contacts.length === 0) {
+      try {
+        const full = await api.getLead(lead.id);
+        if (full) {
+          const mappedContacts: ContactItem[] = (full.contacts || []).map((c) => {
+            const titleLower = (c.job_title || '').toLowerCase();
+            const isExecutive =
+              titleLower.includes('director') ||
+              titleLower.includes('chief') ||
+              titleLower.includes('vp') ||
+              titleLower.includes('head') ||
+              titleLower.includes('founder') ||
+              titleLower.includes('officer');
+            const isCLevel =
+              titleLower.includes('chief') ||
+              titleLower.includes('ceo') ||
+              titleLower.includes('cto') ||
+              titleLower.includes('cio') ||
+              titleLower.includes('cfo');
+            return {
+              name: c.name,
+              job_title: c.job_title || 'Executive Decision Maker',
+              email: c.email || undefined,
+              email_status: c.email_status || 'verified',
+              confidence_score: c.confidence_score || undefined,
+              seniority: isExecutive ? 'Executive' : 'Management',
+              is_c_level: isCLevel
+            };
+          });
+
+          setInspectedLead((prev) =>
+            prev?.id === lead.id
+              ? {
+                  ...prev,
+                  company_name: full.company_name,
+                  website: full.website,
+                  industry: full.industry || prev.industry,
+                  location: full.location || prev.location,
+                  company_size: full.company_size || prev.company_size,
+                  fit_score: full.fit_score || prev.fit_score,
+                  fit_reason: full.fit_reason || prev.fit_reason,
+                  strengths: full.fit_strengths || prev.strengths,
+                  risks: full.fit_risks || prev.risks,
+                  contacts: mappedContacts
+                }
+              : prev
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }
+  };
+
 
 
   const handleProfileChange = (val: string) => {
@@ -597,8 +426,8 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
           setSearchResults(freshLeads.slice(0, quantity));
           setInspectedLead(freshLeads[0]);
         } else {
-          setSearchResults(SAMPLE_COMPANIES);
-          setInspectedLead(SAMPLE_COMPANIES[0]);
+          setSearchResults([]);
+          setInspectedLead(null);
         }
       }
 
@@ -623,42 +452,23 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
   };
 
   const formatEmailCount = (lead: DiscoveredResultItem): string => {
-    if (lead.email_count) return lead.email_count.toLocaleString();
-    if (lead.company_name === 'Ethiopian Airlines') return '3,155';
-    if (lead.company_name === 'Ethio telecom') return '2,520';
-    if (lead.company_name === 'Addis Ababa University') return '1,536';
-    if (lead.company_name === 'Bank of Abyssinia') return '1,057';
-    if (lead.company_name === 'Dashen Bank') return '973';
-    if (lead.company_name === 'Adigrat University') return '499';
-    if (lead.company_name === 'Awash Bank') return '453';
-    if (lead.company_name.includes('United Nations')) return '380';
-
-    const size = lead.company_size || '';
-    if (size.includes('10,001') || size.includes('1000+')) {
-      const hash = ((lead.id * 739) % 2500) + 1200;
-      return hash.toLocaleString();
-    } else if (size.includes('1,001') || size.includes('250 - 1000')) {
-      const hash = ((lead.id * 431) % 900) + 600;
-      return hash.toLocaleString();
-    } else if (size.includes('100 - 250')) {
-      const hash = ((lead.id * 197) % 250) + 120;
-      return hash.toLocaleString();
-    } else if (size.includes('25 - 100')) {
-      const hash = ((lead.id * 89) % 70) + 35;
-      return hash.toLocaleString();
+    if (lead.email_count !== undefined && lead.email_count !== null) {
+      return lead.email_count.toLocaleString();
     }
-
-    const base = lead.contacts && lead.contacts.length > 0 ? lead.contacts.length * 14 + 18 : 28;
-    return base.toLocaleString();
+    if (lead.contacts && lead.contacts.length > 0) {
+      return lead.contacts.length.toLocaleString();
+    }
+    return '0';
   };
 
   const isHiring = (lead: DiscoveredResultItem): boolean => {
-    const hiringCompanies = ['Ethio telecom', 'Bank of Abyssinia', 'Dashen Bank'];
-    if (hiringCompanies.includes(lead.company_name)) return true;
     if (lead.strengths && lead.strengths.some((s) => s.toLowerCase().includes('hiring') || s.toLowerCase().includes('growth'))) {
       return true;
     }
-    return lead.id % 2 === 0;
+    if (lead.signals && lead.signals.some((s) => s.type.toLowerCase().includes('hiring'))) {
+      return true;
+    }
+    return false;
   };
 
   const handleToggleSelectAll = () => {
@@ -1355,6 +1165,19 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
         </div>
       )}
 
+            {/* Empty State when no results found */}
+      {!isSearching && searchResults.length === 0 && (
+        <div className="bg-[#121217] border border-[#22222c] rounded-2xl p-12 text-center space-y-3 animate-fade-in">
+          <div className="w-12 h-12 rounded-2xl bg-[#181824] border border-[#262638] flex items-center justify-center mx-auto text-slate-400">
+            <Building2 className="w-6 h-6 text-[#f95721]" />
+          </div>
+          <h3 className="text-sm font-bold text-white">No Discovered Companies</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            Select your target job titles, industries, location, and company size above, then click <span className="text-white font-semibold">Search Leads</span> to discover live verified prospects.
+          </p>
+        </div>
+      )}
+
       {/* Hunter.io Split-View: Discovered Companies List (Left) + Company Inspector Panel (Right) */}
       {searchResults.length > 0 && (
         <div className="space-y-3 animate-fade-in">
@@ -1382,7 +1205,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                   />
                   <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
                     <span className="text-white font-bold">
-                      {searchResults.length === 8 ? '3,462' : searchResults.length.toLocaleString()}
+                      {searchResults.length.toLocaleString()}
                     </span>
                     <span>companies match your filters</span>
                   </span>
@@ -1418,7 +1241,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                   return (
                     <div
                       key={lead.id}
-                      onClick={() => setInspectedLead(lead)}
+                      onClick={() => handleInspectLead(lead)}
                       className={`group flex items-center justify-between px-3.5 py-3 transition-all cursor-pointer ${
                         isInspected
                           ? 'bg-[#181826] border-l-4 border-l-[#f95721] shadow-inner'
@@ -1612,10 +1435,10 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                   {/* Left sub-column */}
                   <div className="space-y-1.5">
                     <div className="text-slate-200 font-medium">
-                      {inspectedLead.industry || 'Business Services'}
+                      {inspectedLead.industry || 'Not specified'}
                     </div>
                     <div className="text-slate-400">
-                      {inspectedLead.company_size || '10,001+ employees'}
+                      {inspectedLead.company_size || 'Not specified'}
                     </div>
                     {inspectedLead.founded_year && (
                       <div className="text-slate-400 flex items-center gap-1">
@@ -1663,7 +1486,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                     )}
                     <div className="text-slate-400 flex items-start gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
-                      <span>{inspectedLead.location || 'Addis Ababa, Ethiopia'}</span>
+                      <span>{inspectedLead.location || 'Location not specified'}</span>
                     </div>
 
                     {/* Social Icons (LinkedIn & Facebook SVGs) */}
@@ -1772,7 +1595,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                             : 'text-slate-400 hover:text-slate-200'
                         }`}
                       >
-                        People · {inspectedLead.people_count?.toLocaleString() || '2,909'}
+                        People · {(inspectedLead.people_count || inspectedLead.contacts?.length || 0).toLocaleString()}
                       </button>
                       <button
                         type="button"
@@ -1783,7 +1606,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                             : 'text-slate-400 hover:text-slate-200'
                         }`}
                       >
-                        Decision makers · {inspectedLead.decision_maker_count?.toLocaleString() || '66'}
+                        Decision makers · {(inspectedLead.decision_maker_count || inspectedLead.contacts?.filter((c) => c.seniority === 'Executive' || c.is_c_level || c.job_title?.toLowerCase().includes('director') || c.job_title?.toLowerCase().includes('officer') || c.job_title?.toLowerCase().includes('head') || c.job_title?.toLowerCase().includes('manager')).length || 0).toLocaleString()}
                       </button>
                       <button
                         type="button"
@@ -1794,7 +1617,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                             : 'text-slate-400 hover:text-slate-200'
                         }`}
                       >
-                        Generic · {inspectedLead.generic_count?.toLocaleString() || '246'}
+                        Generic · {(inspectedLead.generic_count || inspectedLead.contacts?.filter((c) => c.email && (c.email.startsWith('info@') || c.email.startsWith('contact@') || c.email.startsWith('support@'))).length || 0).toLocaleString()}
                       </button>
                     </div>
 
@@ -1809,7 +1632,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                           {isExecutiveOpen ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
                           <span>Executive</span>
                           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#222230] text-slate-300">
-                            {inspectedLead.contacts?.filter((c) => c.seniority === 'Executive').length || 72}
+                            {inspectedLead.contacts?.filter((c) => c.seniority === 'Executive' || c.is_c_level).length || 0}
                           </span>
                         </span>
                         <span className="text-[11px] text-[#f95721] font-medium">Hunter.io Verified</span>
@@ -1818,79 +1641,80 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                       {/* Contacts List */}
                       {isExecutiveOpen && (
                         <div className="divide-y divide-[#1a1a24] bg-[#0f0f14]">
-                          {(inspectedLead.contacts && inspectedLead.contacts.length > 0
-                            ? inspectedLead.contacts
-                            : [
-                                { name: 'Executive Representative', job_title: 'Chief Commercial Officer', email: `info@${cleanDomain(inspectedLead.website)}`, email_status: 'verified', confidence_score: 95, is_c_level: true }
-                              ]
-                          ).map((contact, idx) => (
-                            <div
-                              key={idx}
-                              className="px-3.5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#151520] transition-colors group"
-                            >
-                              <div className="flex items-center gap-3 min-w-0">
-                                <input
-                                  type="checkbox"
-                                  className="w-4 h-4 rounded text-[#f95721] focus:ring-0 bg-[#14141c] border-[#333346] cursor-pointer"
-                                />
-                                
-                                <div>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-xs text-white">
-                                      {contact.name}
-                                    </span>
-                                    {contact.is_c_level && (
-                                      <span title="C-Level Executive">
-                                        <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          {inspectedLead.contacts && inspectedLead.contacts.length > 0 ? (
+                            inspectedLead.contacts.map((contact, idx) => (
+                              <div
+                                key={idx}
+                                className="px-3.5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#151520] transition-colors group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    className="w-4 h-4 rounded text-[#f95721] focus:ring-0 bg-[#14141c] border-[#333346] cursor-pointer"
+                                  />
+                                  
+                                  <div>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-bold text-xs text-white">
+                                        {contact.name}
                                       </span>
-                                    )}
-                                    <span className="text-slate-500 text-xs">|</span>
-                                    <span className="text-xs text-slate-300">
-                                      {contact.job_title}
-                                    </span>
-                                  </div>
-
-                                  {contact.email && (
-                                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1 font-mono">
-                                      <span>{contact.email}</span>
-                                      <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-sans">
-                                        <Check className="w-2.5 h-2.5" />
-                                        <span>{contact.confidence_score || 95}% verified</span>
+                                      {contact.is_c_level && (
+                                        <span title="C-Level Executive">
+                                          <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                        </span>
+                                      )}
+                                      <span className="text-slate-500 text-xs">|</span>
+                                      <span className="text-xs text-slate-300">
+                                        {contact.job_title}
                                       </span>
                                     </div>
-                                  )}
-                                </div>
-                              </div>
 
-                              {/* Action Buttons: Copy Email & Draft Outreach */}
-                              <div className="flex items-center gap-2 self-end sm:self-center">
-                                {contact.email && (
+                                    {contact.email && (
+                                      <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1 font-mono">
+                                        <span>{contact.email}</span>
+                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-sans">
+                                          <Check className="w-2.5 h-2.5" />
+                                          <span>{contact.confidence_score ? `${contact.confidence_score}% verified` : (contact.email_status || 'verified')}</span>
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Action Buttons: Copy Email & Draft Outreach */}
+                                <div className="flex items-center gap-2 self-end sm:self-center">
+                                  {contact.email && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyEmail(contact.email!)}
+                                      className="p-1.5 rounded-lg bg-[#181824] hover:bg-[#222230] border border-[#262638] text-slate-400 hover:text-white transition-colors"
+                                      title="Copy email address"
+                                    >
+                                      {copiedEmail === contact.email ? (
+                                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                      ) : (
+                                        <Copy className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  )}
+
                                   <button
                                     type="button"
-                                    onClick={() => handleCopyEmail(contact.email!)}
-                                    className="p-1.5 rounded-lg bg-[#181824] hover:bg-[#222230] border border-[#262638] text-slate-400 hover:text-white transition-colors"
-                                    title="Copy email address"
+                                    onClick={() => onSelectLead(inspectedLead.id)}
+                                    className="px-2.5 py-1 rounded-lg bg-[#f95721]/15 hover:bg-[#f95721]/25 border border-[#f95721]/40 text-[#f95721] text-[11px] font-bold flex items-center gap-1 transition-colors"
+                                    title="Prepare personalized cold outreach"
                                   >
-                                    {copiedEmail === contact.email ? (
-                                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                    ) : (
-                                      <Copy className="w-3.5 h-3.5" />
-                                    )}
+                                    <Send className="w-3 h-3" />
+                                    <span>Outreach</span>
                                   </button>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectLead(inspectedLead.id)}
-                                  className="px-2.5 py-1 rounded-lg bg-[#f95721]/15 hover:bg-[#f95721]/25 border border-[#f95721]/40 text-[#f95721] text-[11px] font-bold flex items-center gap-1 transition-colors"
-                                  title="Prepare personalized cold outreach"
-                                >
-                                  <Send className="w-3 h-3" />
-                                  <span>Outreach</span>
-                                </button>
+                                </div>
                               </div>
+                            ))
+                          ) : (
+                            <div className="p-6 text-center text-xs text-slate-500">
+                              No verified contacts discovered yet for this company. Click "Full CRM Dossier" to run contact discovery.
                             </div>
-                          ))}
+                          )}
                         </div>
                       )}
                     </div>
@@ -1904,22 +1728,23 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                     <p className="text-slate-400 text-xs">
                       Web technologies, cloud stack, and business software detected via Firecrawl domain crawl:
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {(inspectedLead.technologies || [
-                        { name: 'Amazon Web Services (AWS)', category: 'Cloud Infrastructure' },
-                        { name: 'Cloudflare', category: 'CDN & Security' },
-                        { name: 'Microsoft 365 Enterprise', category: 'Email & Productivity' },
-                        { name: 'Oracle ERP System', category: 'Enterprise Core' }
-                      ]).map((tech, idx) => (
-                        <div key={idx} className="p-3 rounded-xl bg-[#0c0c10] border border-[#1e1e28] flex items-center gap-2.5">
-                          <Cpu className="w-4 h-4 text-[#f95721] shrink-0" />
-                          <div>
-                            <div className="font-bold text-white text-xs">{tech.name}</div>
-                            <div className="text-[10px] text-slate-500">{tech.category}</div>
+                    {inspectedLead.technologies && inspectedLead.technologies.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {inspectedLead.technologies.map((tech, idx) => (
+                          <div key={idx} className="p-3 rounded-xl bg-[#0c0c10] border border-[#1e1e28] flex items-center gap-2.5">
+                            <Cpu className="w-4 h-4 text-[#f95721] shrink-0" />
+                            <div>
+                              <div className="font-bold text-white text-xs">{tech.name}</div>
+                              <div className="text-[10px] text-slate-500">{tech.category}</div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-[#0c0c10] border border-[#1e1e28] text-slate-500 text-center text-xs">
+                        No technology stack detected for this domain.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1929,23 +1754,26 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                     <p className="text-slate-400 text-xs">
                       Public business triggers, hiring initiatives, and technology upgrades:
                     </p>
-                    <div className="space-y-2">
-                      {(inspectedLead.signals || [
-                        { type: 'Hiring', title: 'Actively recruiting IT Infrastructure & Cloud Architects', date: 'Oct 2026' },
-                        { type: 'Expansion', title: 'Announced strategic expansion in East African markets', date: 'Sep 2026' }
-                      ]).map((signal, idx) => (
-                        <div key={idx} className="p-3 rounded-xl bg-[#0c0c10] border border-[#1e1e28] flex items-start gap-2.5">
-                          <Radio className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                          <div>
-                            <div className="font-bold text-white text-xs">{signal.title}</div>
-                            <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
-                              <span className="text-emerald-400 font-semibold">{signal.type}</span>
-                              {signal.date && <span>• {signal.date}</span>}
+                    {inspectedLead.signals && inspectedLead.signals.length > 0 ? (
+                      <div className="space-y-2">
+                        {inspectedLead.signals.map((signal, idx) => (
+                          <div key={idx} className="p-3 rounded-xl bg-[#0c0c10] border border-[#1e1e28] flex items-start gap-2.5">
+                            <Radio className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                            <div>
+                              <div className="font-bold text-white text-xs">{signal.title}</div>
+                              <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
+                                <span className="text-emerald-400 font-semibold">{signal.type}</span>
+                                {signal.date && <span>• {signal.date}</span>}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-[#0c0c10] border border-[#1e1e28] text-slate-500 text-center text-xs">
+                        No public hiring or business signals detected yet.
+                      </div>
+                    )}
                   </div>
                 )}
 

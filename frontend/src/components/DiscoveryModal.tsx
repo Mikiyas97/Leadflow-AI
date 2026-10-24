@@ -150,7 +150,7 @@ export const DiscoveryModal: React.FC<DiscoveryModalProps> = ({
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Addis Ababa, Ethiopia or United States"
+                placeholder="e.g. United States or California, USA"
                 className="w-full mt-1 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
                 required
               />

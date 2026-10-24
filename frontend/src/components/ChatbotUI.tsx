@@ -34,8 +34,8 @@ import { api } from '../services/api';
 
 const QUICK_PROMPTS = [
   "SaaS companies in the United States that may need AI automation",
-  "Find 5 hotels in Addis Ababa without an official website and draft website-development emails",
-  "Find Ethiopian SaaS companies that may need AI automation",
+  "Find 5 software companies without an official website and draft website-development emails",
+  "Find B2B fintech startups in California that may need AI automation",
   "Approve all pending outreach drafts",
   "Show pipeline activity audit log",
 ];
@@ -451,7 +451,7 @@ export const ChatbotUI: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => handleSend("Find 5 hotels in Addis Ababa without an official website and draft website-development emails")}
+                  onClick={() => handleSend("Find 5 software companies without an official website and draft website-development emails")}
                   className="w-full p-3.5 rounded-xl bg-[#121217] hover:bg-[#181820] hover:border-amber-500/40 border border-[#252532] text-left transition-all group shadow-md flex items-center justify-between"
                 >
                   <div className="space-y-1">
@@ -459,10 +459,10 @@ export const ChatbotUI: React.FC = () => {
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                         Website Pitch Workflow
                       </span>
-                      <span className="text-[11px] text-amber-400 font-medium">Addis Ababa, Ethiopia</span>
+                      <span className="text-[11px] text-amber-400 font-medium">No Official Website</span>
                     </div>
                     <div className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-amber-300 transition-colors">
-                      "Find 5 hotels in Addis Ababa without an official website and draft website-development emails"
+                      "Find 5 software companies without an official website and draft website-development emails"
                     </div>
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 ml-3">
@@ -471,7 +471,7 @@ export const ChatbotUI: React.FC = () => {
                 </button>
 
                 <button
-                  onClick={() => handleSend("Find Ethiopian SaaS companies that may need AI automation")}
+                  onClick={() => handleSend("Find B2B fintech startups in California that may need AI automation")}
                   className="w-full p-3.5 rounded-xl bg-[#121217] hover:bg-[#181820] hover:border-blue-500/40 border border-[#252532] text-left transition-all group shadow-md flex items-center justify-between"
                 >
                   <div className="space-y-1">
@@ -479,10 +479,10 @@ export const ChatbotUI: React.FC = () => {
                       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
                         Strict Geography Workflow
                       </span>
-                      <span className="text-[11px] text-blue-400 font-medium">Ethiopia Only (No US Bleed)</span>
+                      <span className="text-[11px] text-blue-400 font-medium">California, USA</span>
                     </div>
                     <div className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-blue-300 transition-colors">
-                      "Find Ethiopian SaaS companies that may need AI automation"
+                      "Find B2B fintech startups in California that may need AI automation"
                     </div>
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 ml-3">

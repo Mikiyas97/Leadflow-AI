@@ -42,9 +42,9 @@ export const CriteriaAndSchedulesView: React.FC<CriteriaAndSchedulesViewProps> =
   // Schedule Form state (FR-10)
   const [schedName, setSchedName] = useState<string>('');
   const [schedInterval, setSchedInterval] = useState<number>(24);
-  const [schedIndustry, setSchedIndustry] = useState<string>('Hospitality / Hotels');
-  const [schedLocation, setSchedLocation] = useState<string>('Addis Ababa, Ethiopia');
-  const [schedCriteria, setSchedCriteria] = useState<string>('Hotels without an official website needing web development');
+  const [schedIndustry, setSchedIndustry] = useState<string>('B2B SaaS / Software');
+  const [schedLocation, setSchedLocation] = useState<string>('United States');
+  const [schedCriteria, setSchedCriteria] = useState<string>('High-growth software companies that need automated outbound sales workflows');
   const [schedMaxLeads, setSchedMaxLeads] = useState<number>(5);
   const [isCreatingSchedule, setIsCreatingSchedule] = useState<boolean>(false);
 
@@ -255,7 +255,7 @@ export const CriteriaAndSchedulesView: React.FC<CriteriaAndSchedulesViewProps> =
                   type="text"
                   value={profileName}
                   onChange={(e) => setProfileName(e.target.value)}
-                  placeholder="e.g. Ethiopian Tech Startups"
+                  placeholder="e.g. High-Growth B2B SaaS Startups"
                   className="w-full mt-1 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f95721]"
                   required
                 />
@@ -283,7 +283,7 @@ export const CriteriaAndSchedulesView: React.FC<CriteriaAndSchedulesViewProps> =
                     type="text"
                     value={profileLocation}
                     onChange={(e) => setProfileLocation(e.target.value)}
-                    placeholder="e.g. Ethiopia"
+                    placeholder="e.g. United States or California, USA"
                     className="w-full mt-1 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f95721]"
                   />
                 </div>
@@ -427,7 +427,7 @@ export const CriteriaAndSchedulesView: React.FC<CriteriaAndSchedulesViewProps> =
                   type="text"
                   value={schedName}
                   onChange={(e) => setSchedName(e.target.value)}
-                  placeholder="e.g. Daily Addis Ababa Hotel Crawl"
+                  placeholder="e.g. Daily US B2B SaaS Discovery"
                   className="w-full mt-1 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
                   required
                 />
@@ -474,7 +474,7 @@ export const CriteriaAndSchedulesView: React.FC<CriteriaAndSchedulesViewProps> =
                     type="text"
                     value={schedIndustry}
                     onChange={(e) => setSchedIndustry(e.target.value)}
-                    placeholder="e.g. Hospitality / Hotels"
+                    placeholder="e.g. B2B SaaS"
                     className="w-full mt-1 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-emerald-400"
                     required
                   />
@@ -487,7 +487,7 @@ export const CriteriaAndSchedulesView: React.FC<CriteriaAndSchedulesViewProps> =
                     type="text"
                     value={schedLocation}
                     onChange={(e) => setSchedLocation(e.target.value)}
-                    placeholder="e.g. Addis Ababa, Ethiopia"
+                    placeholder="e.g. United States or California, USA"
                     className="w-full mt-1 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-emerald-400"
                   />
                 </div>
@@ -501,7 +501,7 @@ export const CriteriaAndSchedulesView: React.FC<CriteriaAndSchedulesViewProps> =
                   rows={2}
                   value={schedCriteria}
                   onChange={(e) => setSchedCriteria(e.target.value)}
-                  placeholder="e.g. Hotels without official website in Addis Ababa needing custom direct booking sites..."
+                  placeholder="e.g. High-growth software companies that need automated outbound sales workflows..."
                   className="w-full mt-1 p-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400 resize-none"
                   required
                 />
