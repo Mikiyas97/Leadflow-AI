@@ -49,6 +49,27 @@ def init_db():
             except Exception:
                 pass
 
+    # Seed default target profile if not present (FR-01)
+    try:
+        from backend.app.models import TargetProfile
+        db = SessionLocal()
+        existing = db.query(TargetProfile).filter(
+            TargetProfile.name == "IT Administrators and Business Decision Makers at SMBs"
+        ).first()
+        if not existing:
+            default_profile = TargetProfile(
+                name="IT Administrators and Business Decision Makers at SMBs",
+                industry="Software & Internet, Computers & Electronics, Business Services",
+                location="United States",
+                company_size="25 - 250",
+                criteria="IT Director, IT Manager, Chief Information Officer, VP of IT, Head of IT, Director of Information Technology at SMBs (25-250 employees) for IT infrastructure and workflow automation."
+            )
+            db.add(default_profile)
+            db.commit()
+        db.close()
+    except Exception:
+        pass
+
 
 # Auto-initialize database tables and columns on module load
 try:

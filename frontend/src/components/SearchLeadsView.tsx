@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Compass,
   SlidersHorizontal,
   Sparkles,
   MapPin,
@@ -17,7 +16,11 @@ import {
   Layers,
   RotateCcw,
   ShieldCheck,
-  Search
+  Search,
+  Check,
+  Plus,
+  X,
+  BookmarkPlus
 } from 'lucide-react';
 import type { TargetProfile } from '../types';
 import { api } from '../services/api';
@@ -51,15 +54,47 @@ interface DiscoveredResultItem {
 
 interface FormPreset {
   title: string;
-  industry: string;
+  name: string;
   location: string;
-  companySize: string;
+  jobTitles: string[];
+  industries: string[];
+  companySizes: string[];
   serviceOffered: string;
-  targetDecisionMakers: string;
   requireNoWebsite: boolean;
   quantity: number;
   tag: string;
 }
+
+// Available options
+const AVAILABLE_JOB_TITLES = [
+  'IT Director',
+  'IT Manager',
+  'Chief Information Officer',
+  'VP of IT',
+  'Head of IT',
+  'Director of Information Technology',
+  'Founder & CEO',
+  'Chief Technology Officer',
+  'General Manager'
+];
+
+const AVAILABLE_INDUSTRIES = [
+  'Software & Internet',
+  'Computers & Electronics',
+  'Business Services',
+  'Hospitality',
+  'Healthcare & Clinics',
+  'Financial Services',
+  'Digital Marketing Agencies'
+];
+
+const AVAILABLE_SIZES = [
+  '1 - 25',
+  '25 - 100',
+  '100 - 250',
+  '250 - 1000',
+  '1000+'
+];
 
 export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
   onSelectLead,
@@ -70,13 +105,36 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
   const [profiles, setProfiles] = useState<TargetProfile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<number | 'custom'>('custom');
 
-  // Form Fields (Exclusively form-based lead search)
-  const [industry, setIndustry] = useState<string>('Hospitality');
-  const [location, setLocation] = useState<string>('Addis Ababa, Ethiopia');
-  const [companySize, setCompanySize] = useState<string>('Local Business / SME');
-  const [serviceOffered, setServiceOffered] = useState<string>('Website & Digital Presence Development');
-  const [targetDecisionMakers, setTargetDecisionMakers] = useState<string>('General Manager, Owner, Managing Director');
-  const [requireNoWebsite, setRequireNoWebsite] = useState<boolean>(true);
+  // Form Fields
+  const [personaName, setPersonaName] = useState<string>('IT Administrators and Business Decision Makers at SMBs');
+  const [selectedJobTitles, setSelectedJobTitles] = useState<string[]>([
+    'IT Director',
+    'IT Manager',
+    'Chief Information Officer',
+    'VP of IT',
+    'Head of IT',
+    'Director of Information Technology'
+  ]);
+  const [customJobTitleInput, setCustomJobTitleInput] = useState<string>('');
+
+  const [location, setLocation] = useState<string>('United States');
+
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([
+    'Software & Internet',
+    'Computers & Electronics',
+    'Business Services'
+  ]);
+  const [customIndustryInput, setCustomIndustryInput] = useState<string>('');
+
+  const [selectedCompanySizes, setSelectedCompanySizes] = useState<string[]>([
+    '25 - 100',
+    '100 - 250'
+  ]);
+
+  const [serviceOffered, setServiceOffered] = useState<string>(
+    'Enterprise IT Infrastructure, Cloud Management & Cybersecurity Automation'
+  );
+  const [requireNoWebsite, setRequireNoWebsite] = useState<boolean>(false);
   const [requireVerifiedEmail, setRequireVerifiedEmail] = useState<boolean>(true);
   const [quantity, setQuantity] = useState<number>(5);
 
@@ -86,53 +144,65 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
   const [searchResults, setSearchResults] = useState<DiscoveredResultItem[]>([]);
   const [searchSummary, setSearchSummary] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
 
-  // Quick Form Presets (Populate form inputs with a single click)
+  // Form Presets
   const formPresets: FormPreset[] = [
     {
+      title: '⭐ IT Admins & Decision Makers (SMBs)',
+      name: 'IT Administrators and Business Decision Makers at SMBs',
+      location: 'United States',
+      jobTitles: [
+        'IT Director',
+        'IT Manager',
+        'Chief Information Officer',
+        'VP of IT',
+        'Head of IT',
+        'Director of Information Technology'
+      ],
+      industries: ['Software & Internet', 'Computers & Electronics', 'Business Services'],
+      companySizes: ['25 - 100', '100 - 250'],
+      serviceOffered: 'Enterprise IT Infrastructure, Cloud Management & Cybersecurity Automation',
+      requireNoWebsite: false,
+      quantity: 5,
+      tag: 'IT / SMB'
+    },
+    {
       title: 'Addis Ababa Hotels (No Website)',
-      industry: 'Hospitality',
+      name: 'Addis Ababa Boutique Hotels & Lodges',
       location: 'Addis Ababa, Ethiopia',
-      companySize: 'Local Business / SME',
-      serviceOffered: 'Website & Digital Presence Development',
-      targetDecisionMakers: 'General Manager, Owner, Managing Director',
+      jobTitles: ['General Manager', 'Owner', 'Managing Director'],
+      industries: ['Hospitality'],
+      companySizes: ['1 - 25', '25 - 100'],
+      serviceOffered: 'Official Website & Digital Presence Development',
       requireNoWebsite: true,
       quantity: 5,
-      tag: 'Hospitality',
+      tag: 'Hospitality'
     },
     {
       title: 'US B2B SaaS Startups',
-      industry: 'B2B SaaS',
+      name: 'High-Growth US B2B SaaS',
       location: 'United States',
-      companySize: 'Growth Stage (20-100 employees)',
+      jobTitles: ['Founder & CEO', 'Chief Technology Officer', 'Head of IT'],
+      industries: ['Software & Internet'],
+      companySizes: ['25 - 100'],
       serviceOffered: 'AI Customer Support Automation',
-      targetDecisionMakers: 'Founder, CEO, CTO, Head of Support',
       requireNoWebsite: false,
       quantity: 5,
-      tag: 'Tech',
+      tag: 'B2B SaaS'
     },
     {
       title: 'California Marketing Agencies',
-      industry: 'Digital Marketing Agencies',
+      name: 'California Digital Agencies',
       location: 'California, USA',
-      companySize: 'Boutique Agency (10-50 employees)',
-      serviceOffered: 'Automated Outbound Sales Prospecting',
-      targetDecisionMakers: 'Agency Owner, VP Business Development, Managing Partner',
+      jobTitles: ['Founder & CEO', 'VP of IT', 'General Manager'],
+      industries: ['Digital Marketing Agencies', 'Business Services'],
+      companySizes: ['25 - 100'],
+      serviceOffered: 'Automated Sales Pipeline & Outbound Prospecting',
       requireNoWebsite: false,
       quantity: 5,
-      tag: 'Agencies',
-    },
-    {
-      title: 'London Healthcare Clinics',
-      industry: 'Healthcare & Private Clinics',
-      location: 'London, UK',
-      companySize: 'Local Practice (5-30 employees)',
-      serviceOffered: 'Patient Booking System & Inbound AI Assistant',
-      targetDecisionMakers: 'Clinic Director, Practice Manager, Founder',
-      requireNoWebsite: false,
-      quantity: 5,
-      tag: 'Healthcare',
-    },
+      tag: 'Agencies'
+    }
   ];
 
   useEffect(() => {
@@ -144,20 +214,22 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
       const data = await api.getProfiles();
       setProfiles(data);
     } catch {
-      // ignore silently if profiles unavailable
+      // ignore
     }
   };
 
   const handleApplyPreset = (preset: FormPreset) => {
-    setIndustry(preset.industry);
+    setPersonaName(preset.name);
     setLocation(preset.location);
-    setCompanySize(preset.companySize);
+    setSelectedJobTitles([...preset.jobTitles]);
+    setSelectedIndustries([...preset.industries]);
+    setSelectedCompanySizes([...preset.companySizes]);
     setServiceOffered(preset.serviceOffered);
-    setTargetDecisionMakers(preset.targetDecisionMakers);
     setRequireNoWebsite(preset.requireNoWebsite);
     setQuantity(preset.quantity);
     setSelectedProfileId('custom');
     setErrorMessage(null);
+    setSaveSuccessMessage(null);
   };
 
   const handleProfileChange = (val: string) => {
@@ -168,32 +240,102 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
       setSelectedProfileId(pId);
       const prof = profiles.find((p) => p.id === pId);
       if (prof) {
-        setIndustry(prof.industry || 'B2B SaaS');
+        setPersonaName(prof.name);
         setLocation(prof.location || 'United States');
-        setCompanySize(prof.company_size || 'Growth Stage (20-100 employees)');
-        setServiceOffered(prof.criteria || 'Sales Operations Automation');
+        if (prof.industry) {
+          const splitInd = prof.industry.split(',').map((s) => s.trim()).filter(Boolean);
+          setSelectedIndustries(splitInd);
+        }
+        if (prof.company_size) {
+          setSelectedCompanySizes([prof.company_size]);
+        }
+        if (prof.criteria) {
+          setServiceOffered(prof.criteria);
+        }
       }
     }
   };
 
+  const handleToggleJobTitle = (title: string) => {
+    setSelectedJobTitles((prev) =>
+      prev.includes(title) ? prev.filter((t) => t !== title) : [...prev, title]
+    );
+  };
+
+  const handleAddCustomJobTitle = () => {
+    const val = customJobTitleInput.trim();
+    if (val && !selectedJobTitles.includes(val)) {
+      setSelectedJobTitles((prev) => [...prev, val]);
+      setCustomJobTitleInput('');
+    }
+  };
+
+  const handleToggleIndustry = (ind: string) => {
+    setSelectedIndustries((prev) =>
+      prev.includes(ind) ? prev.filter((i) => i !== ind) : [...prev, ind]
+    );
+  };
+
+  const handleAddCustomIndustry = () => {
+    const val = customIndustryInput.trim();
+    if (val && !selectedIndustries.includes(val)) {
+      setSelectedIndustries((prev) => [...prev, val]);
+      setCustomIndustryInput('');
+    }
+  };
+
+  const handleToggleSize = (size: string) => {
+    setSelectedCompanySizes((prev) =>
+      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]
+    );
+  };
+
   const handleResetForm = () => {
-    setIndustry('');
-    setLocation('');
-    setCompanySize('Any Size / All Stages');
+    setPersonaName('');
+    setLocation('United States');
+    setSelectedJobTitles([]);
+    setSelectedIndustries([]);
+    setSelectedCompanySizes(['25 - 100']);
     setServiceOffered('');
-    setTargetDecisionMakers('');
     setRequireNoWebsite(false);
     setRequireVerifiedEmail(true);
     setQuantity(5);
     setSelectedProfileId('custom');
     setErrorMessage(null);
+    setSaveSuccessMessage(null);
+  };
+
+  const handleSaveAsProfile = async () => {
+    if (!personaName.trim()) {
+      setErrorMessage('Please provide a Campaign / Persona Name to save.');
+      return;
+    }
+    try {
+      const newProf = await api.createProfile({
+        name: personaName.trim(),
+        industry: selectedIndustries.join(', ') || 'Software & Internet',
+        location: location.trim() || 'United States',
+        company_size: selectedCompanySizes.join(', ') || '25 - 100, 100 - 250',
+        criteria: `${selectedJobTitles.join(', ')} | ${serviceOffered}`
+      });
+      setProfiles((prev) => [newProf, ...prev]);
+      setSelectedProfileId(newProf.id);
+      setSaveSuccessMessage(`Successfully saved "${newProf.name}" to Target Profiles (FR-01)!`);
+      setTimeout(() => setSaveSuccessMessage(null), 4000);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to save Target Profile.');
+    }
   };
 
   const handleExecuteSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    if (!industry.trim() || !location.trim()) {
-      setErrorMessage('Please specify both a Target Industry and Target Location.');
+    if (selectedIndustries.length === 0) {
+      setErrorMessage('Please include at least one Target Industry.');
+      return;
+    }
+    if (!location.trim()) {
+      setErrorMessage('Please specify a Target Location.');
       return;
     }
 
@@ -201,17 +343,18 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
     setIsSearching(true);
     setActiveStep(1);
 
-    // Visual step feedback timers
     const stepTimer1 = setTimeout(() => setActiveStep(2), 1400);
     const stepTimer2 = setTimeout(() => setActiveStep(3), 3200);
 
     try {
+      const industryStr = selectedIndustries.join(', ');
+      const sizeStr = selectedCompanySizes.length > 0 ? ` of company size ${selectedCompanySizes.join(' or ')} employees` : '';
+      const locationStr = location.trim();
       const noWebClause = requireNoWebsite ? ' without an official website' : '';
-      const sizeClause = companySize && companySize !== 'Any Size / All Stages' ? ` (${companySize})` : '';
-      const rolesClause = targetDecisionMakers.trim() ? ` (target decision-maker roles: ${targetDecisionMakers.trim()})` : '';
+      const rolesClause = selectedJobTitles.length > 0 ? ` (target decision-maker job titles: ${selectedJobTitles.join(', ')})` : '';
       const pitchClause = serviceOffered.trim() ? ` and pitch ${serviceOffered.trim()}` : '';
 
-      const promptText = `Find ${quantity} ${industry.trim()} companies${sizeClause} in ${location.trim()}${noWebClause}${pitchClause}${rolesClause}`;
+      const promptText = `Find ${quantity} companies in ${industryStr}${sizeStr} in ${locationStr}${noWebClause}${pitchClause}${rolesClause}`;
 
       const res = await api.sendChat([{ role: 'user', content: promptText }]);
       
@@ -221,8 +364,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
       if (res.pipeline_leads && res.pipeline_leads.length > 0) {
         setSearchResults(res.pipeline_leads);
       } else {
-        // Fallback: fetch newly recorded leads matching criteria
-        const freshLeads = await api.getLeads({ search: industry || location });
+        const freshLeads = await api.getLeads({ search: selectedIndustries[0] || locationStr });
         setSearchResults(freshLeads.slice(0, quantity));
       }
 
@@ -281,7 +423,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
             </span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Fill the search form to discover candidate companies via Google Search, crawl websites with Firecrawl, evaluate suitability with Gemini AI, and find decision-maker emails with Hunter.io.
+            Configure your target customer criteria below. LeadFlow discovers companies via Google Search, crawls official domains with Firecrawl, scores fit with Gemini, and verifies decision-maker emails with Hunter.io.
           </p>
         </div>
 
@@ -296,33 +438,68 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
       </div>
 
       {/* Preset Form Templates */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1 mr-1">
-          <Sparkles className="w-3.5 h-3.5 text-[#f95721]" /> Form Presets:
-        </span>
-        {formPresets.map((preset, idx) => (
-          <button
-            key={idx}
-            type="button"
-            onClick={() => handleApplyPreset(preset)}
-            className="px-2.5 py-1 rounded-lg bg-[#111116] hover:bg-[#1a1a22] border border-[#22222e] hover:border-[#f95721]/50 text-slate-300 hover:text-white text-[11px] transition-colors flex items-center gap-1.5"
-          >
-            <span className="font-medium">{preset.title}</span>
-            <span className="text-[9px] px-1 py-0.2 rounded bg-[#1c1c28] text-[#f95721] font-mono">
-              {preset.tag}
-            </span>
-          </button>
-        ))}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+          <Sparkles className="w-3.5 h-3.5 text-[#f95721]" />
+          <span>Quick Form Templates:</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {formPresets.map((preset, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleApplyPreset(preset)}
+              className="px-3 py-1.5 rounded-xl bg-[#111116] hover:bg-[#1a1a22] border border-[#22222e] hover:border-[#f95721]/50 text-slate-300 hover:text-white text-[11px] transition-colors flex items-center gap-2 shadow-sm"
+            >
+              <span className="font-semibold">{preset.title}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#1c1c28] text-[#f95721] font-mono">
+                {preset.tag}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Exclusively Structured Search Form */}
-      <form onSubmit={handleExecuteSearch} className="bg-[#121217] border border-[#22222c] rounded-2xl p-5 shadow-xl space-y-5">
+      {/* Saved Success Notification */}
+      {saveSuccessMessage && (
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2 animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{saveSuccessMessage}</span>
+        </div>
+      )}
+
+      {/* Structured Search Form */}
+      <form onSubmit={handleExecuteSearch} className="bg-[#121217] border border-[#22222c] rounded-2xl p-5 shadow-xl space-y-6">
         
-        {/* Row 1: Target Profile Selector & Quantity */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Section 1: Campaign Name & Target Profile Pre-fill */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b border-[#1c1c26]">
           <div className="md:col-span-2">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Briefcase className="w-3.5 h-3.5 text-[#f95721]" />
+                <span>Search Campaign / Persona Name</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleSaveAsProfile}
+                className="text-[10px] text-[#f95721] hover:underline flex items-center gap-1 normal-case font-medium"
+              >
+                <BookmarkPlus className="w-3 h-3" />
+                <span>Save to Target Profiles (FR-01)</span>
+              </button>
+            </label>
+            <input
+              type="text"
+              value={personaName}
+              onChange={(e) => setPersonaName(e.target.value)}
+              placeholder="e.g. IT Administrators and Business Decision Makers at SMBs"
+              className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white font-medium focus:outline-none focus:border-[#f95721]"
+            />
+          </div>
+
+          <div>
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Layers className="w-3 h-3 text-[#f95721]" />
+              <Layers className="w-3.5 h-3.5 text-slate-400" />
               <span>Target Profile (ICP Pre-fill)</span>
             </label>
             <select
@@ -330,18 +507,313 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
               onChange={(e) => handleProfileChange(e.target.value)}
               className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
             >
-              <option value="custom">Custom Search Criteria (Manual)</option>
+              <option value="custom">Custom Form Parameters</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.industry} • {p.location || 'Any'})
+                  {p.name}
                 </option>
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Section 2: Job Title (Include) */}
+        <div className="space-y-2 pb-4 border-b border-[#1c1c26]">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <Users className="w-3.5 h-3.5 text-[#f95721]" />
+              <span>Job Title</span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-semibold">
+                Include ({selectedJobTitles.length})
+              </span>
+            </label>
+            <div className="flex items-center gap-2 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setSelectedJobTitles([...AVAILABLE_JOB_TITLES])}
+                className="text-slate-400 hover:text-slate-200"
+              >
+                Select All
+              </button>
+              <span className="text-slate-600">|</span>
+              <button
+                type="button"
+                onClick={() => setSelectedJobTitles([])}
+                className="text-slate-400 hover:text-slate-200"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Job Title Selectable Tags */}
+          <div className="flex flex-wrap items-center gap-2">
+            {AVAILABLE_JOB_TITLES.map((title) => {
+              const isSelected = selectedJobTitles.includes(title);
+              return (
+                <button
+                  key={title}
+                  type="button"
+                  onClick={() => handleToggleJobTitle(title)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                    isSelected
+                      ? 'bg-[#f95721]/15 border-[#f95721]/50 text-white shadow-sm'
+                      : 'bg-[#0c0c10] border-[#22222e] text-slate-400 hover:text-slate-200 hover:border-[#333346]'
+                  }`}
+                >
+                  {isSelected && <Check className="w-3 h-3 text-[#f95721]" />}
+                  <span>{title}</span>
+                </button>
+              );
+            })}
+
+            {/* Custom job titles not in default list */}
+            {selectedJobTitles
+              .filter((t) => !AVAILABLE_JOB_TITLES.includes(t))
+              .map((customTitle) => (
+                <span
+                  key={customTitle}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium bg-[#f95721]/20 border border-[#f95721] text-white flex items-center gap-1.5"
+                >
+                  <Check className="w-3 h-3 text-[#f95721]" />
+                  <span>{customTitle}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleJobTitle(customTitle)}
+                    className="hover:text-red-400 ml-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+          </div>
+
+          {/* Add custom Job Title input */}
+          <div className="flex items-center gap-2 max-w-sm pt-1">
+            <input
+              type="text"
+              value={customJobTitleInput}
+              onChange={(e) => setCustomJobTitleInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddCustomJobTitle();
+                }
+              }}
+              placeholder="Add another job title..."
+              className="flex-1 px-3 py-1.5 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
+            />
+            <button
+              type="button"
+              onClick={handleAddCustomJobTitle}
+              className="px-3 py-1.5 rounded-xl bg-[#181822] hover:bg-[#222230] border border-[#2a2a3a] text-slate-300 text-xs font-semibold flex items-center gap-1 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Add</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Section 3: Location (Include) */}
+        <div className="space-y-2 pb-4 border-b border-[#1c1c26]">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <MapPin className="w-3.5 h-3.5 text-[#f95721]" />
+              <span>Location</span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-semibold">
+                Include: {location || 'Not Specified'}
+              </span>
+            </label>
+            <span className="text-[10px] text-slate-500">Label: United States (Default)</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {['United States', 'California, USA', 'Addis Ababa, Ethiopia', 'United Kingdom', 'Canada', 'Remote / Global'].map((locOption) => {
+              const isSelected = location.toLowerCase().includes(locOption.toLowerCase());
+              return (
+                <button
+                  key={locOption}
+                  type="button"
+                  onClick={() => setLocation(locOption)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                    isSelected
+                      ? 'bg-[#f95721]/15 border-[#f95721]/50 text-white shadow-sm'
+                      : 'bg-[#0c0c10] border-[#22222e] text-slate-400 hover:text-slate-200 hover:border-[#333346]'
+                  }`}
+                >
+                  {isSelected && <Check className="w-3 h-3 text-[#f95721]" />}
+                  <span>{locOption}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="max-w-md pt-1">
+            <input
+              type="text"
+              required
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. United States or Addis Ababa, Ethiopia"
+              className="w-full px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
+            />
+          </div>
+        </div>
+
+        {/* Section 4: Industry (Include) */}
+        <div className="space-y-2 pb-4 border-b border-[#1c1c26]">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <Building2 className="w-3.5 h-3.5 text-[#f95721]" />
+              <span>Industry</span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-semibold">
+                Include ({selectedIndustries.length})
+              </span>
+            </label>
+            <div className="flex items-center gap-2 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setSelectedIndustries([...AVAILABLE_INDUSTRIES])}
+                className="text-slate-400 hover:text-slate-200"
+              >
+                Select All
+              </button>
+              <span className="text-slate-600">|</span>
+              <button
+                type="button"
+                onClick={() => setSelectedIndustries([])}
+                className="text-slate-400 hover:text-slate-200"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Industry Selectable Tags */}
+          <div className="flex flex-wrap items-center gap-2">
+            {AVAILABLE_INDUSTRIES.map((ind) => {
+              const isSelected = selectedIndustries.includes(ind);
+              return (
+                <button
+                  key={ind}
+                  type="button"
+                  onClick={() => handleToggleIndustry(ind)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                    isSelected
+                      ? 'bg-[#f95721]/15 border-[#f95721]/50 text-white shadow-sm'
+                      : 'bg-[#0c0c10] border-[#22222e] text-slate-400 hover:text-slate-200 hover:border-[#333346]'
+                  }`}
+                >
+                  {isSelected && <Check className="w-3 h-3 text-[#f95721]" />}
+                  <span>{ind}</span>
+                </button>
+              );
+            })}
+
+            {/* Custom industry tags */}
+            {selectedIndustries
+              .filter((i) => !AVAILABLE_INDUSTRIES.includes(i))
+              .map((customInd) => (
+                <span
+                  key={customInd}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium bg-[#f95721]/20 border border-[#f95721] text-white flex items-center gap-1.5"
+                >
+                  <Check className="w-3 h-3 text-[#f95721]" />
+                  <span>{customInd}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleIndustry(customInd)}
+                    className="hover:text-red-400 ml-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+          </div>
+
+          {/* Add custom Industry input */}
+          <div className="flex items-center gap-2 max-w-sm pt-1">
+            <input
+              type="text"
+              value={customIndustryInput}
+              onChange={(e) => setCustomIndustryInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddCustomIndustry();
+                }
+              }}
+              placeholder="Add another industry..."
+              className="flex-1 px-3 py-1.5 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
+            />
+            <button
+              type="button"
+              onClick={handleAddCustomIndustry}
+              className="px-3 py-1.5 rounded-xl bg-[#181822] hover:bg-[#222230] border border-[#2a2a3a] text-slate-300 text-xs font-semibold flex items-center gap-1 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Add</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Section 5: Company Size */}
+        <div className="space-y-2 pb-4 border-b border-[#1c1c26]">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <Users className="w-3.5 h-3.5 text-[#f95721]" />
+              <span>Company Size (Employees)</span>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-semibold">
+                {selectedCompanySizes.join(', ') || 'Any'}
+              </span>
+            </label>
+            <span className="text-[10px] text-slate-500">Includes 25 - 100 & 100 - 250 (SMBs)</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {AVAILABLE_SIZES.map((size) => {
+              const isSelected = selectedCompanySizes.includes(size);
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => handleToggleSize(size)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 border ${
+                    isSelected
+                      ? 'bg-[#f95721]/15 border-[#f95721]/50 text-white shadow-sm'
+                      : 'bg-[#0c0c10] border-[#22222e] text-slate-400 hover:text-slate-200 hover:border-[#333346]'
+                  }`}
+                >
+                  {isSelected && <Check className="w-3 h-3 text-[#f95721]" />}
+                  <span>{size} employees</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 6: Value Proposition & Discovery Parameters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b border-[#1c1c26]">
+          <div className="md:col-span-2">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-[#f95721]" />
+              <span>Value Proposition / Pitch Angle</span>
+            </label>
+            <input
+              type="text"
+              value={serviceOffered}
+              onChange={(e) => setServiceOffered(e.target.value)}
+              placeholder="e.g. Enterprise IT Infrastructure, Cloud Management & Cybersecurity Automation"
+              className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
+            />
+            <span className="text-[10px] text-slate-500 mt-1 block">
+              Gemini evaluates lead suitability and drafts personalized cold email outreach based on this pitch.
+            </span>
+          </div>
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Compass className="w-3 h-3 text-[#f95721]" />
+              <Search className="w-3.5 h-3.5 text-[#f95721]" />
               <span>Target Quantity</span>
             </label>
             <select
@@ -357,96 +829,8 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
           </div>
         </div>
 
-        {/* Row 2: Target Industry, Location, Company Size */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Building2 className="w-3 h-3 text-[#f95721]" />
-              <span>Target Industry *</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              placeholder="e.g. Hospitality, B2B SaaS, Healthcare"
-              className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
-            />
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <MapPin className="w-3 h-3 text-[#f95721]" />
-              <span>Target Location (City / Region / Country) *</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="e.g. Addis Ababa, Ethiopia or United States"
-              className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
-            />
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Users className="w-3 h-3 text-[#f95721]" />
-              <span>Company Size & Stage</span>
-            </label>
-            <select
-              value={companySize}
-              onChange={(e) => setCompanySize(e.target.value)}
-              className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
-            >
-              <option value="Any Size / All Stages">Any Size / All Stages</option>
-              <option value="Local Business / SME">Local Business / SME (1-20 employees)</option>
-              <option value="Growth Stage (20-100 employees)">Growth Stage (20-100 employees)</option>
-              <option value="Mid-Market & Enterprise (100+ employees)">Mid-Market & Enterprise (100+ employees)</option>
-              <option value="Bootstrapped / Seed Startups">Bootstrapped / Seed Startups</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Row 3: Value Proposition / Pitch & Target Decision Makers */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Briefcase className="w-3 h-3 text-[#f95721]" />
-              <span>Value Proposition / Service to Pitch</span>
-            </label>
-            <input
-              type="text"
-              value={serviceOffered}
-              onChange={(e) => setServiceOffered(e.target.value)}
-              placeholder="e.g. Website Development, AI Support Automation, CRM Ops"
-              className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
-            />
-            <span className="text-[10px] text-slate-500 mt-1 block">
-              Gemini uses this to assess business fit and generate personalized outreach drafts.
-            </span>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Mail className="w-3 h-3 text-[#f95721]" />
-              <span>Target Decision-Maker Roles (Hunter.io)</span>
-            </label>
-            <input
-              type="text"
-              value={targetDecisionMakers}
-              onChange={(e) => setTargetDecisionMakers(e.target.value)}
-              placeholder="e.g. Founder, CEO, CTO, General Manager, Head of Sales"
-              className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#0c0c10] border border-[#22222e] text-xs text-white focus:outline-none focus:border-[#f95721]"
-            />
-            <span className="text-[10px] text-slate-500 mt-1 block">
-              Hunter.io Email Finder prioritizes verified addresses matching these titles.
-            </span>
-          </div>
-        </div>
-
-        {/* Row 4: Constraint Options */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+        {/* Section 7: Strict Constraints */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#0c0c10] border border-[#22222e] hover:border-[#333346] cursor-pointer transition-colors">
             <input
               type="checkbox"
@@ -459,7 +843,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                 Strict Constraint: Target companies without an official website
               </span>
               <span className="text-[10px] text-slate-400">
-                Filters candidates that only have directory or social listings (ideal for web dev pitches).
+                Filters candidate businesses that lack official domains (verified with Firecrawl).
               </span>
             </div>
           </label>
@@ -477,13 +861,13 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                 <span>Verify Deliverability with Hunter.io</span>
               </span>
               <span className="text-[10px] text-slate-400">
-                Validates deliverable SMTP status and assigns confidence score to every contact found.
+                Prioritizes verified emails for IT Directors, Managers, CIOs, and VPs.
               </span>
             </div>
           </label>
         </div>
 
-        {/* Form Action Controls */}
+        {/* Action Controls */}
         <div className="flex items-center justify-between pt-3 border-t border-[#1c1c26]">
           <button
             type="button"
@@ -497,13 +881,13 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
 
           <button
             type="submit"
-            disabled={isSearching || !industry.trim() || !location.trim()}
+            disabled={isSearching || selectedIndustries.length === 0 || !location.trim()}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#f95721] to-[#ea4710] hover:brightness-110 text-white font-bold text-xs shadow-md shadow-[#f95721]/25 transition-all disabled:opacity-50"
           >
             {isSearching ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Executing Lead Discovery...</span>
+                <span>Discovering Leads...</span>
               </>
             ) : (
               <>
@@ -516,7 +900,7 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
 
       </form>
 
-      {/* Live Pipeline Steps Progress (Visible when searching) */}
+      {/* Live Pipeline Steps Progress */}
       {isSearching && (
         <div className="bg-[#121217] border border-[#22222c] rounded-2xl p-4 shadow-lg space-y-3 animate-fade-in">
           <div className="text-xs font-bold text-white flex items-center justify-between">
@@ -693,9 +1077,9 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
           <div className="h-12 w-12 rounded-2xl bg-[#171720] mx-auto flex items-center justify-center text-[#f95721] shadow-inner">
             <SlidersHorizontal className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-bold text-white">Configure Search Criteria Above</h3>
+          <h3 className="text-sm font-bold text-white">Target Criteria Ready</h3>
           <p className="text-xs text-slate-400 leading-relaxed">
-            Specify your target industry, geography, company size, and pitch angle in the form above or pick a quick preset. The automated LeadFlow pipeline will discover candidates, verify official websites, score suitability with Gemini, and find verified decision-makers via Hunter.io.
+            Click <strong>Execute Lead Search</strong> to discover matching companies in <strong>{location}</strong> across <strong>{selectedIndustries.join(', ')}</strong> with decision-makers matching your selected IT roles.
           </p>
         </div>
       )}

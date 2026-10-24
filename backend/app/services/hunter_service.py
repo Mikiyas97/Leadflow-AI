@@ -7,7 +7,9 @@ from backend.app.config import settings
 logger = logging.getLogger("leadflow.hunter")
 
 DECISION_MAKER_TITLES = [
-    "founder", "co-founder", "ceo", "cto", "coo", "chief",
+    "founder", "co-founder", "ceo", "cto", "cio", "coo", "chief",
+    "chief information officer", "it director", "it manager", "head of it",
+    "vp of it", "director of information technology", "information technology",
     "head of operations", "head of", "director", "vice president", "vp",
     "owner", "president", "managing director"
 ]
