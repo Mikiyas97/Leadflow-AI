@@ -9,7 +9,8 @@ from sqlalchemy import (
     ForeignKey,
     JSON,
     Enum,
-    Float
+    Float,
+    Boolean
 )
 from sqlalchemy.orm import relationship
 from backend.app.database import Base
@@ -155,3 +156,24 @@ class ActivityLog(Base):
     # Relationships
     run = relationship("AutomationRun", back_populates="activity_logs")
     lead = relationship("Lead", back_populates="activity_logs")
+
+
+class DiscoverySchedule(Base):
+    __tablename__ = "discovery_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(Integer, ForeignKey("target_profiles.id", ondelete="SET NULL"), nullable=True)
+    name = Column(String(255), nullable=False)
+    interval_hours = Column(Integer, default=24)  # run interval in hours (1, 6, 12, 24)
+    industry = Column(String(255), nullable=False)
+    location = Column(String(255), nullable=True)
+    company_size = Column(String(100), nullable=True)
+    criteria = Column(Text, nullable=False)
+    max_leads = Column(Integer, default=5)
+    is_active = Column(Boolean, default=True)
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    profile = relationship("TargetProfile")

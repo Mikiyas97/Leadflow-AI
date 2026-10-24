@@ -49,3 +49,10 @@ def init_db():
             except Exception:
                 pass
 
+
+# Auto-initialize database tables and columns on module load
+try:
+    init_db()
+except Exception:
+    pass
+

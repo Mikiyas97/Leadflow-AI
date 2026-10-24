@@ -27,6 +27,7 @@ def list_leads(
     search: Optional[str] = None,
     status: Optional[str] = None,
     min_score: Optional[int] = None,
+    is_overdue: Optional[bool] = None,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db)
@@ -51,7 +52,31 @@ def list_leads(
     if min_score is not None:
         query = query.filter(Lead.fit_score >= min_score)
 
+    if is_overdue:
+        now = datetime.utcnow()
+        query = query.filter(
+            Lead.follow_up_date.isnot(None),
+            Lead.follow_up_date <= now,
+            Lead.follow_up_status != "COMPLETED",
+            Lead.status != "ARCHIVED"
+        )
+
     return query.order_by(Lead.created_at.desc()).offset(offset).limit(limit).all()
+
+
+@router.get("/overdue", response_model=List[LeadResponse])
+def list_overdue_leads(
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """Retrieve all leads with overdue follow-ups (FR-09)."""
+    now = datetime.utcnow()
+    return db.query(Lead).filter(
+        Lead.follow_up_date.isnot(None),
+        Lead.follow_up_date <= now,
+        Lead.follow_up_status != "COMPLETED",
+        Lead.status != "ARCHIVED"
+    ).order_by(Lead.follow_up_date.asc()).limit(limit).all()
 
 
 @router.get("/{lead_id}", response_model=LeadDetailResponse)

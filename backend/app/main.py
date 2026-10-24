@@ -1,4 +1,4 @@
-"""LeadFlow AI Agent - FastAPI Application Entrypoint"""
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,13 +11,21 @@ from backend.app.routes.drafts import router as drafts_router
 from backend.app.routes.activity import router as activity_router
 from backend.app.routes.dashboard import router as dashboard_router
 from backend.app.routes.chat import router as chat_router
+from backend.app.routes.schedules import router as schedules_router
+from backend.app.services.scheduler_service import scheduler_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize database tables
     init_db()
-    yield
+    # Start background scheduled lead discovery loop (FR-10)
+    scheduler_task = asyncio.create_task(scheduler_service.start_scheduler_loop(poll_interval_seconds=60))
+    try:
+        yield
+    finally:
+        scheduler_service.stop()
+        scheduler_task.cancel()
 
 
 app = FastAPI(
@@ -51,6 +59,8 @@ app.include_router(leads_router, prefix=settings.API_V1_STR)
 app.include_router(drafts_router, prefix=settings.API_V1_STR)
 app.include_router(activity_router, prefix=settings.API_V1_STR)
 app.include_router(dashboard_router, prefix=settings.API_V1_STR)
+app.include_router(schedules_router, prefix=settings.API_V1_STR)
+
 
 
 @app.get("/")

@@ -212,12 +212,80 @@ class ActivityLogResponse(BaseModel):
 
 
 # ==========================================
-# Dashboard & Stats Schemas
+# Dashboard & Stats Schemas (FR-09, FR-11)
 # ==========================================
+class OverdueLeadItem(BaseModel):
+    id: int
+    company_name: str
+    website: str
+    location: Optional[str] = None
+    industry: Optional[str] = None
+    follow_up_date: datetime
+    follow_up_notes: Optional[str] = None
+    follow_up_status: Optional[str] = None
+    days_overdue: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PerformanceSummary(BaseModel):
+    total_leads_discovered: int
+    total_qualified_leads: int
+    total_drafts_prepared: int
+    total_approved_drafts: int
+    total_sent_emails: int
+    qualification_rate: float
+
+
 class DashboardStatsResponse(BaseModel):
     total_leads: int
     qualified_leads: int
     pending_drafts: int
     approved_drafts: int
+    overdue_followups_count: int = 0
+    total_drafts_prepared: int = 0
+    sent_emails: int = 0
+    qualification_rate: float = 0.0
+    overdue_leads: List[OverdueLeadItem] = []
+    performance_summary: Optional[PerformanceSummary] = None
     recent_runs: List[DiscoveryRunResponse]
     recent_activities: List[ActivityLogResponse]
+
+
+# ==========================================
+# Discovery Schedule Schemas (FR-10)
+# ==========================================
+class DiscoveryScheduleBase(BaseModel):
+    name: str
+    interval_hours: int = 24
+    industry: str
+    location: Optional[str] = "United States"
+    company_size: Optional[str] = "20-100"
+    criteria: str
+    max_leads: int = 5
+    is_active: bool = True
+    profile_id: Optional[int] = None
+
+
+class DiscoveryScheduleCreate(DiscoveryScheduleBase):
+    pass
+
+
+class DiscoveryScheduleUpdate(BaseModel):
+    name: Optional[str] = None
+    interval_hours: Optional[int] = None
+    industry: Optional[str] = None
+    location: Optional[str] = None
+    company_size: Optional[str] = None
+    criteria: Optional[str] = None
+    max_leads: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class DiscoveryScheduleResponse(DiscoveryScheduleBase):
+    id: int
+    last_run_at: Optional[datetime] = None
+    next_run_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
