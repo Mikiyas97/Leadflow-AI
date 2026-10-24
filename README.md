@@ -213,34 +213,57 @@ cd frontend
 npm run build
 ```
 
+## 7. Functional Requirements Compliance Matrix
+
+| Requirement | Description | Implementation Status & Key Components |
+|---|---|---|
+| **FR-01** | Define target customer criteria (industry, company type, business characteristics) | ✅ **Implemented**: `TargetProfile` model, `POST /api/target-profiles`, chat query parser, Criteria & Profiles Manager view. |
+| **FR-02** | Discover potential companies using public company data and save matching leads | ✅ **Implemented**: Hunter.io domain search, Firecrawl scraping, curated geographical discovery, `POST /api/discovery-runs`, deduplication. |
+| **FR-03** | Retrieve company info, use Gemini API to assess suitability, score (0-100), and explain reasoning | ✅ **Implemented**: Firecrawl scraping + Gemini 2.5 Flash `analyze_lead_suitability`, structured fit score, strengths, risks, reason. |
+| **FR-04** | Use Hunter.io to find professional emails and verify when permitted | ✅ **Implemented**: `HunterService.search_domain` + `verify_email`, confidence scoring, strict verification threshold (confidence ≥ 80), zero fabricated contacts. |
+| **FR-05** | Generate personalized outreach drafts based on company research and qualification | ✅ **Implemented**: `GeminiService.generate_outreach_email` referencing company research, non-hallucinated copy, `OutreachDraft` entity. |
+| **FR-06** | Dashboard for viewing, searching, filtering, and managing lead records and statuses | ✅ **Implemented**: `LeadExplorerView.tsx`, search input, status pills (ALL, NEW, QUALIFIED, CONTACTED, UNQUALIFIED, ARCHIVED), in-table status updates. |
+| **FR-07** | Review, edit, and approve outreach drafts before any email is sent | ✅ **Implemented**: `OutreachReviewView.tsx` with draft subject/body editor, `approveDraft` (marks APPROVED), explicit Gmail SMTP send modal with idempotency. |
+| **FR-08** | Detect duplicate leads and maintain records of automation runs, results, and errors | ✅ **Implemented**: Deduplication gate by domain/name, `AutomationRun` model (tracks discovered/qualified/drafts), `ActivityLog` audit feed (`ActivityFeedView.tsx`). |
+| **FR-09** | Identify overdue follow-ups and display them in the dashboard | ✅ **Implemented**: `GET /api/dashboard/stats` calculates overdue follow-ups, `GET /api/leads/overdue`, interactive Overdue Alert widget with quick rescheduling. |
+| **FR-10** | Support scheduled lead-discovery runs where deployment environment permits | ✅ **Implemented**: `SchedulerService` in-process background worker, `DiscoverySchedule` model, `/api/schedules` CRUD + instant trigger, automated periodic runs. |
+| **FR-11** | Provide performance summaries (leads discovered, qualified leads, drafts prepared) | ✅ **Implemented**: `DashboardView.tsx` KPI grid, total leads, qualified leads, fit rate %, drafts under review, approved drafts, sent emails via SMTP. |
+
 ---
 
-## 7. REST API Endpoints
+## 8. REST API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/health` | Service health and integration status |
 | `POST` | `/api/chat` | Autonomous 8-step pipeline execution and criteria parsing |
-| `GET` | `/api/dashboard/stats` | High-level metrics and activity feed |
-| `POST` | `/api/target-profiles` | Create new ICP target profile |
+| `GET` | `/api/dashboard/stats` | High-level metrics, overdue follow-ups, and activity feed (FR-09, FR-11) |
+| `POST` | `/api/target-profiles` | Create new ICP target profile (FR-01) |
 | `GET` | `/api/target-profiles` | List saved target profiles |
 | `POST` | `/api/discovery-runs` | Start asynchronous discovery run |
 | `GET` | `/api/discovery-runs/{id}` | Poll discovery run status & counts |
-| `GET` | `/api/leads` | Search and filter leads (status, score) |
+| `GET` | `/api/leads` | Search and filter leads (status, score, overdue) (FR-06) |
+| `GET` | `/api/leads/overdue` | List leads with overdue follow-up touchpoints (FR-09) |
 | `GET` | `/api/leads/{id}` | Full lead details with research & contacts |
 | `PATCH` | `/api/leads/{id}` | Update lead fields or status |
-| `POST` | `/api/leads/{id}/analyze` | Trigger re-analysis with Gemini |
-| `POST` | `/api/leads/{id}/draft` | Generate personalized email draft |
+| `POST` | `/api/leads/{id}/analyze` | Trigger re-analysis with Gemini (FR-03) |
+| `POST` | `/api/leads/{id}/draft` | Generate personalized email draft (FR-05) |
+| `POST` | `/api/leads/{id}/reschedule-followup` | Reschedule follow-up touchpoint date & notes |
 | `GET` | `/api/drafts` | List outreach drafts (DRAFT / APPROVED / SENT) |
-| `PATCH` | `/api/drafts/{id}` | Edit email subject or body |
-| `POST` | `/api/drafts/{id}/approve` | Approve draft for human outreach |
+| `PATCH` | `/api/drafts/{id}` | Edit email subject or body (FR-07) |
+| `POST` | `/api/drafts/{id}/approve` | Approve draft for human outreach (FR-07) |
 | `POST` | `/api/drafts/{id}/send` | Send approved email via Gmail SMTP (idempotent, schedules follow-up) |
 | `POST` | `/api/drafts/test-email` | Explicit test email dispatch to verify Gmail SMTP credentials |
-| `GET` | `/api/activity` | Retrieve execution logs and audit trail |
+| `GET` | `/api/schedules` | List recurring discovery schedules (FR-10) |
+| `POST` | `/api/schedules` | Create new periodic lead discovery schedule (FR-10) |
+| `PATCH` | `/api/schedules/{id}` | Update or toggle active status of schedule (FR-10) |
+| `DELETE` | `/api/schedules/{id}` | Delete discovery schedule |
+| `POST` | `/api/schedules/{id}/trigger` | Trigger immediate discovery run for schedule (FR-10) |
+| `GET` | `/api/activity` | Retrieve execution logs and audit trail (FR-08) |
 
 ---
 
-## 8. Deployment
+## 9. Deployment
 
 - **Frontend:** Deploy to [Vercel](https://vercel.com) connecting the `frontend` directory.
 - **Backend:** Deploy to [Render](https://render.com) using `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`.
@@ -248,6 +271,7 @@ npm run build
 
 ---
 
-## 9. License
+## 10. License
 
 MIT License. Developed for Brain3.ai.
+
