@@ -68,6 +68,7 @@ class PipelineLead(BaseModel):
     website: str
     industry: Optional[str] = None
     location: Optional[str] = None
+    company_size: Optional[str] = None
     website_status: Optional[str] = "HAS_OFFICIAL_WEBSITE"
     website_evidence: Optional[str] = None
     fit_score: int
@@ -137,6 +138,7 @@ def format_lead_pipeline_obj(lead: Lead) -> PipelineLead:
         website=lead.website,
         industry=lead.industry,
         location=lead.location,
+        company_size=lead.company_size,
         website_status=lead.website_status or "HAS_OFFICIAL_WEBSITE",
         fit_score=lead.fit_score or 0,
         fit_reason=lead.fit_reason,

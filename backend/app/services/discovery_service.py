@@ -377,6 +377,89 @@ class DiscoveryService:
                 ]
                 return [s for s in ethiopian_saas if s["website"] not in excluded]
 
+            else:
+                # Ethiopian prominent organizations & enterprises (from Hunter.io domain search)
+                ethiopian_enterprises = [
+                    {
+                        "company_name": "Ethiopian Airlines",
+                        "website": "ethiopianairlines.com",
+                        "industry": "Airlines and Aviation",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "10,001+",
+                        "source_url": "https://www.ethiopianairlines.com/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "Flag carrier airline of Ethiopia headquartered at Bole International Airport, Addis Ababa.",
+                        "description": "Pan-African airline and international carrier based in Addis Ababa, Ethiopia."
+                    },
+                    {
+                        "company_name": "Ethio telecom",
+                        "website": "ethiotelecom.et",
+                        "industry": "Telecommunications",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "10,001+",
+                        "source_url": "https://www.ethiotelecom.et/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "National telecommunications and digital financial services provider in Ethiopia.",
+                        "description": "State-owned telecommunications service provider based in Addis Ababa, Ethiopia."
+                    },
+                    {
+                        "company_name": "Addis Ababa University",
+                        "website": "aau.edu.et",
+                        "industry": "Research",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "1,001–5,000",
+                        "source_url": "https://www.aau.edu.et/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "National university located in Addis Ababa, Ethiopia.",
+                        "description": "Premier higher education and research institution in Ethiopia."
+                    },
+                    {
+                        "company_name": "Bank of Abyssinia",
+                        "website": "bankofabyssinia.com",
+                        "industry": "Financial Services",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "5,001–10,000",
+                        "source_url": "https://www.bankofabyssinia.com/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "Major commercial bank headquartered in Addis Ababa, Ethiopia.",
+                        "description": "Leading private commercial bank in Ethiopia."
+                    },
+                    {
+                        "company_name": "Dashen Bank",
+                        "website": "dashenbanksc.com",
+                        "industry": "Banking",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "10,001+",
+                        "source_url": "https://dashenbanksc.com/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "Commercial bank headquartered in Addis Ababa, Ethiopia.",
+                        "description": "Tier-1 private commercial bank operating across Ethiopia."
+                    },
+                    {
+                        "company_name": "Adigrat University",
+                        "website": "adu.edu.et",
+                        "industry": "Research & Education",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "1,001–5,000",
+                        "source_url": "https://www.adu.edu.et/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "Higher education and research institution with liaison in Addis Ababa.",
+                        "description": "Public research university institution."
+                    },
+                    {
+                        "company_name": "Awash Bank",
+                        "website": "awashbank.com",
+                        "industry": "Banking",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "10,001+",
+                        "source_url": "https://www.awashbank.com/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "Leading private commercial bank in Ethiopia headquartered in Addis Ababa.",
+                        "description": "Largest private commercial bank in Ethiopia by assets and branch network."
+                    }
+                ]
+                return [e for e in ethiopian_enterprises if e["website"] not in excluded]
+
         # United States curated dataset
         elif "united states" in location_lower or "san francisco" in location_lower or "new york" in location_lower:
             us_saas = [

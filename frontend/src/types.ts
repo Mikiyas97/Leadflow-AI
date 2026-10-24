@@ -31,6 +31,8 @@ export interface PipelineLead {
   website: string;
   industry?: string | null;
   location?: string | null;
+  company_size?: string | null;
+  email_count?: number | null;
   website_status?: 'HAS_OFFICIAL_WEBSITE' | 'NO_OFFICIAL_WEBSITE_FOUND' | 'WEBSITE_STATUS_UNCERTAIN' | string | null;
   website_evidence?: string | null;
   fit_score: number;
