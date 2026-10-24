@@ -1,10 +1,15 @@
 """LeadFlow AI - Application Configuration"""
 import os
-from pydantic_settings import BaseSettings
-from typing import List
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
     PROJECT_NAME: str = "LeadFlow AI Agent"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api"
@@ -22,11 +27,6 @@ class Settings(BaseSettings):
 
     # Server
     PORT: int = int(os.getenv("PORT", "8000"))
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
 
 
 settings = Settings()

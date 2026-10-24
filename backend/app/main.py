@@ -4,6 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.config import settings
 from backend.app.database import init_db
+from backend.app.routes.profiles import router as profiles_router
+from backend.app.routes.discovery import router as discovery_router
+from backend.app.routes.leads import router as leads_router
+from backend.app.routes.drafts import router as drafts_router
+from backend.app.routes.activity import router as activity_router
+from backend.app.routes.dashboard import router as dashboard_router
 
 
 @asynccontextmanager
@@ -35,6 +41,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register API Routers under /api
+app.include_router(profiles_router, prefix=settings.API_V1_STR)
+app.include_router(discovery_router, prefix=settings.API_V1_STR)
+app.include_router(leads_router, prefix=settings.API_V1_STR)
+app.include_router(drafts_router, prefix=settings.API_V1_STR)
+app.include_router(activity_router, prefix=settings.API_V1_STR)
+app.include_router(dashboard_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

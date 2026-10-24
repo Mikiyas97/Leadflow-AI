@@ -1,7 +1,7 @@
 """LeadFlow AI - Pydantic Request & Response Schemas"""
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ==========================================
@@ -23,8 +23,7 @@ class TargetProfileResponse(TargetProfileBase):
     id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -48,8 +47,7 @@ class ContactResponse(ContactBase):
     lead_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -63,8 +61,7 @@ class ResearchRecordResponse(BaseModel):
     source_urls: Optional[List[str]] = None
     researched_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -95,8 +92,7 @@ class OutreachDraftResponse(OutreachDraftBase):
     approved_at: Optional[datetime] = None
     contact: Optional[ContactResponse] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -137,8 +133,7 @@ class LeadResponse(LeadBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LeadDetailResponse(LeadResponse):
@@ -180,8 +175,7 @@ class DiscoveryRunResponse(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
@@ -196,8 +190,7 @@ class ActivityLogResponse(BaseModel):
     details: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==========================================
