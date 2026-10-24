@@ -18,12 +18,16 @@ class HunterService:
 
     async def search_domain(self, domain: str, limit: int = 5) -> List[Dict[str, Any]]:
         """
-        Search Hunter.io for email contacts associated with a company domain.
+        Search Hunter.io for verified email contacts associated with a company domain.
+        Returns empty list if no contacts found or service unavailable. Never fabricates contacts.
         """
         clean_domain = self._clean_domain(domain)
+        if not clean_domain or clean_domain.endswith(".local") or clean_domain.endswith(".directory"):
+            return []
+
         if not self.is_configured():
-            logger.info(f"Hunter API key not configured. Using synthetic discovery for {clean_domain}.")
-            return self._fallback_contacts(clean_domain)
+            logger.info(f"Hunter API key not configured. Returning empty contacts for {clean_domain}.")
+            return []
 
         url = f"{self.BASE_URL}/domain-search"
         params = {
@@ -43,37 +47,42 @@ class HunterService:
                     for item in emails:
                         first = item.get("first_name") or ""
                         last = item.get("last_name") or ""
-                        name = f"{first} {last}".strip() or "Executive"
+                        name = f"{first} {last}".strip() or "Business Representative"
                         sources = item.get("sources", [])
                         source_url = sources[0].get("uri") if sources else f"https://{clean_domain}"
+                        confidence = item.get("confidence") or 0
+                        email_val = item.get("value")
+
+                        # Strict verification: verified ONLY if confidence >= 80
+                        status = "verified" if confidence >= 80 else "unverified"
                         
                         contacts.append({
                             "name": name,
                             "job_title": item.get("position") or "Decision Maker",
-                            "email": item.get("value"),
-                            "email_status": "verified" if item.get("confidence", 0) >= 80 else "unverified",
-                            "confidence_score": item.get("confidence", 70),
+                            "email": email_val,
+                            "email_status": status,
+                            "confidence_score": confidence,
                             "source_url": source_url
                         })
-                    return contacts if contacts else self._fallback_contacts(clean_domain)
+                    return contacts
                 
                 elif response.status_code in (402, 429):
-                    logger.warning(f"Hunter.io quota reached or rate-limited (status {response.status_code}). Falling back.")
-                    return self._fallback_contacts(clean_domain)
+                    logger.warning(f"Hunter.io quota reached or rate-limited (status {response.status_code}).")
+                    return []
                 else:
-                    logger.warning(f"Hunter.io returned status {response.status_code}: {response.text}")
-                    return self._fallback_contacts(clean_domain)
+                    logger.warning(f"Hunter.io returned status {response.status_code} for {clean_domain}: {response.text}")
+                    return []
 
         except Exception as e:
-            logger.error(f"Hunter.io network error: {e}")
-            return self._fallback_contacts(clean_domain)
+            logger.error(f"Hunter.io network error for {clean_domain}: {e}")
+            return []
 
     async def verify_email(self, email: str) -> Dict[str, Any]:
         """
         Verify an email address using Hunter.io email-verifier endpoint.
         """
-        if not self.is_configured():
-            return {"status": "unverified", "score": 80, "result": "deliverable"}
+        if not email or not self.is_configured():
+            return {"status": "unverified", "score": 0, "result": "api_not_configured_or_empty"}
 
         url = f"{self.BASE_URL}/email-verifier"
         params = {"email": email, "api_key": self.api_key}
@@ -84,50 +93,27 @@ class HunterService:
                 if res.status_code == 200:
                     data = res.json().get("data", {})
                     status_raw = data.get("status", "unknown")
-                    # Map to standard status
-                    status_map = {
-                        "valid": "verified",
-                        "accept_all": "unverified",
-                        "webmail": "unverified",
-                        "invalid": "invalid",
-                        "disposable": "invalid"
-                    }
+                    score = data.get("score") or 0
+                    
+                    # Strict verification gate: verified only if valid and deliverable
+                    status = "verified" if status_raw == "valid" and score >= 80 else "unverified"
+                    if status_raw in ("invalid", "disposable"):
+                        status = "invalid"
+
                     return {
-                        "status": status_map.get(status_raw, "unverified"),
-                        "score": data.get("score", 70),
+                        "status": status,
+                        "score": score,
                         "result": data.get("result", status_raw)
                     }
                 else:
-                    return {"status": "unverified", "score": 60, "result": "api_quota_or_error"}
+                    return {"status": "unverified", "score": 0, "result": f"http_{res.status_code}"}
         except Exception as e:
             logger.error(f"Hunter email verification error: {e}")
-            return {"status": "unverified", "score": 50, "result": str(e)}
+            return {"status": "unverified", "score": 0, "result": str(e)}
 
     def _clean_domain(self, domain: str) -> str:
         clean = domain.replace("https://", "").replace("http://", "").split("/")[0]
         return clean.strip().lower()
-
-    def _fallback_contacts(self, domain: str) -> List[Dict[str, Any]]:
-        """Provides realistic demo contacts when API key is missing or quota is exhausted."""
-        company_slug = domain.split(".")[0].lower()
-        return [
-            {
-                "name": "Sarah Jenkins",
-                "job_title": "Head of Sales & Revenue Operations",
-                "email": f"sarah.jenkins@{domain}",
-                "email_status": "verified",
-                "confidence_score": 92,
-                "source_url": f"https://{domain}/team"
-            },
-            {
-                "name": "Alex Mercer",
-                "job_title": "VP of Growth & Partnerships",
-                "email": f"a.mercer@{domain}",
-                "email_status": "unverified",
-                "confidence_score": 75,
-                "source_url": f"https://{domain}/about"
-            }
-        ]
 
 
 hunter_service = HunterService()

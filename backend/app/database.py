@@ -31,3 +31,21 @@ def init_db():
     """Create all tables in the database if they do not exist."""
     from backend.app import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
+    
+    # Safe migration for new fields in existing SQLite database
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        for stmt in [
+            "ALTER TABLE leads ADD COLUMN follow_up_notes TEXT",
+            "ALTER TABLE leads ADD COLUMN follow_up_status VARCHAR(50) DEFAULT 'SCHEDULED'",
+            "ALTER TABLE leads ADD COLUMN website_status VARCHAR(50) DEFAULT 'HAS_OFFICIAL_WEBSITE'",
+            "ALTER TABLE outreach_drafts ADD COLUMN sent_at DATETIME",
+            "ALTER TABLE outreach_drafts ADD COLUMN send_error TEXT",
+            "ALTER TABLE outreach_drafts ADD COLUMN idempotency_key VARCHAR(255)"
+        ]:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                pass
+

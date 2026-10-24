@@ -90,9 +90,21 @@ class OutreachDraftResponse(OutreachDraftBase):
     status: str
     created_at: datetime
     approved_at: Optional[datetime] = None
+    sent_at: Optional[datetime] = None
+    send_error: Optional[str] = None
+    idempotency_key: Optional[str] = None
     contact: Optional[ContactResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SendDraftEmailRequest(BaseModel):
+    recipient_email: Optional[str] = None
+    idempotency_key: Optional[str] = None
+
+
+class TestEmailRequest(BaseModel):
+    recipient_email: str
 
 
 # ==========================================
@@ -119,6 +131,9 @@ class LeadUpdate(BaseModel):
     fit_score: Optional[int] = None
     fit_reason: Optional[str] = None
     status: Optional[str] = None  # NEW, QUALIFIED, UNQUALIFIED, CONTACTED, ARCHIVED
+    follow_up_date: Optional[datetime] = None
+    follow_up_notes: Optional[str] = None
+    follow_up_status: Optional[str] = None
 
 
 class LeadResponse(LeadBase):
@@ -130,6 +145,9 @@ class LeadResponse(LeadBase):
     fit_risks: Optional[List[str]] = None
     status: str
     source_url: Optional[str] = None
+    follow_up_date: Optional[datetime] = None
+    follow_up_notes: Optional[str] = None
+    follow_up_status: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

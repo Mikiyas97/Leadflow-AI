@@ -51,6 +51,10 @@ class Lead(Base):
     # Status: NEW, QUALIFIED, UNQUALIFIED, CONTACTED, ARCHIVED
     status = Column(String(50), default="NEW", index=True)
     source_url = Column(String(500), nullable=True)
+    follow_up_date = Column(DateTime, nullable=True)
+    follow_up_notes = Column(Text, nullable=True)
+    follow_up_status = Column(String(50), default="SCHEDULED")
+    website_status = Column(String(50), default="HAS_OFFICIAL_WEBSITE")  # HAS_OFFICIAL_WEBSITE, NO_OFFICIAL_WEBSITE_FOUND, WEBSITE_STATUS_UNCERTAIN
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -104,10 +108,13 @@ class OutreachDraft(Base):
     contact_id = Column(Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True)
     subject = Column(String(255), nullable=False)
     body = Column(Text, nullable=False)
-    # status: "DRAFT", "APPROVED", "REJECTED"
+    # status: "DRAFT", "APPROVED", "REJECTED", "SENT", "FAILED"
     status = Column(String(50), default="DRAFT", index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     approved_at = Column(DateTime, nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    send_error = Column(Text, nullable=True)
+    idempotency_key = Column(String(255), nullable=True, unique=True, index=True)
 
     # Relationships
     lead = relationship("Lead", back_populates="drafts")

@@ -39,7 +39,14 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 export const api = {
   // Chatbot
   sendChat: (messages: { role: string; content: string }[]) =>
-    request<{ role: string; content: string; pipeline_leads?: any[] }>('/chat', {
+    request<{
+      role: string;
+      content: string;
+      parsed_criteria?: any;
+      pipeline_leads?: any[];
+      qualified_count?: number;
+      total_candidates?: number;
+    }>('/chat', {
       method: 'POST',
       body: JSON.stringify({ messages }),
     }),
@@ -96,6 +103,22 @@ export const api = {
       }),
     }),
 
+  rescheduleFollowUp: (
+    id: number,
+    data: { days?: number; date?: string; notes?: string; action_type?: string; status?: string }
+  ) =>
+    request<{
+      lead_id: number;
+      follow_up_date: string;
+      raw_follow_up_date?: string | null;
+      follow_up_notes?: string | null;
+      follow_up_status?: string | null;
+      status?: string;
+    }>(`/leads/${id}/reschedule-followup`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   // Outreach Drafts
   getDrafts: (status?: string) => {
     const query = status ? `?status=${status}` : '';
@@ -111,6 +134,29 @@ export const api = {
   approveDraft: (id: number) =>
     request<OutreachDraft>(`/drafts/${id}/approve`, {
       method: 'POST',
+    }),
+
+  sendDraftEmail: (
+    id: number,
+    data: { recipient_email?: string; idempotency_key?: string }
+  ) =>
+    request<{
+      success: boolean;
+      status: string;
+      message: string;
+      recipient: string;
+      sent_at: string;
+      follow_up_date?: string | null;
+      draft_id: number;
+    }>(`/drafts/${id}/send`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  sendTestEmail: (recipient_email: string) =>
+    request<{ success: boolean; message: string }>('/drafts/test-email', {
+      method: 'POST',
+      body: JSON.stringify({ recipient_email }),
     }),
 
   // Discovery Runs

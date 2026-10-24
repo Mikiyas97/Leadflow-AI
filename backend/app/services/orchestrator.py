@@ -164,7 +164,17 @@ async def execute_discovery_run(run_id: int):
                 level="SUCCESS" if lead.status == "QUALIFIED" else "INFO",
                 details=f"AI Fit Score: {lead.fit_score}/100. Status: {lead.status}. Reason: {lead.fit_reason[:120]}..."
             ))
-            db.commit()
+            is_qualified = lead.status == "QUALIFIED" and (lead.fit_score or 0) >= 65
+            if not is_qualified:
+                db.add(ActivityLog(
+                    run_id=run.id,
+                    lead_id=lead.id,
+                    action="OUTREACH_SKIPPED",
+                    level="INFO",
+                    details=f"Lead '{company_name}' ({lead.fit_score}/100) did not meet qualification threshold. Skipping contact discovery and email drafting."
+                ))
+                db.commit()
+                continue
 
             # Step 4: Contact Discovery via Hunter.io
             raw_contacts = await hunter_service.search_domain(website)

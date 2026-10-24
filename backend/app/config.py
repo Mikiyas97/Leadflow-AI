@@ -28,5 +28,12 @@ class Settings(BaseSettings):
     # Server
     PORT: int = int(os.getenv("PORT", "8000"))
 
+    # Gmail SMTP Configuration for Outreach Emails
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    GMAIL_USER: str = os.getenv("GMAIL_USER", "")
+    GMAIL_APP_PASSWORD: str = os.getenv("GMAIL_APP_PASSWORD", "")
+    EMAIL_FROM: str = os.getenv("EMAIL_FROM", os.getenv("GMAIL_USER", ""))
+
 
 settings = Settings()

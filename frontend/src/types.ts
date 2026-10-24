@@ -7,12 +7,22 @@ export interface PipelineContact {
   confidence_score?: number | null;
 }
 
+export interface ParsedCriteria {
+  industry: string;
+  location: string;
+  target_quantity: number;
+  service_offered: string;
+  require_no_website: boolean;
+}
+
 export interface PipelineDraft {
   id: number;
   subject: string;
   body: string;
-  status: 'DRAFT' | 'APPROVED' | 'REJECTED';
+  status: 'DRAFT' | 'APPROVED' | 'REJECTED' | 'SENT' | 'FAILED';
   approved_at?: string | null;
+  sent_at?: string | null;
+  send_error?: string | null;
 }
 
 export interface PipelineLead {
@@ -21,13 +31,19 @@ export interface PipelineLead {
   website: string;
   industry?: string | null;
   location?: string | null;
+  website_status?: 'HAS_OFFICIAL_WEBSITE' | 'NO_OFFICIAL_WEBSITE_FOUND' | 'WEBSITE_STATUS_UNCERTAIN' | string | null;
+  website_evidence?: string | null;
   fit_score: number;
   fit_reason?: string | null;
   fit_strengths?: string[];
+  fit_risks?: string[];
+  qualification_status?: 'QUALIFIED' | 'UNQUALIFIED' | 'REJECTED_MISMATCH' | string;
   research_summary?: string | null;
   contacts: PipelineContact[];
   draft?: PipelineDraft | null;
   follow_up_date?: string | null;
+  follow_up_notes?: string | null;
+  follow_up_status?: string | null;
 }
 
 export interface ChatMessage {
@@ -35,7 +51,10 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
+  parsed_criteria?: ParsedCriteria | null;
   pipeline_leads?: PipelineLead[] | null;
+  qualified_count?: number;
+  total_candidates?: number;
 }
 
 export interface TargetProfile {

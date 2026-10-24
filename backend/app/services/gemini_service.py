@@ -34,74 +34,192 @@ class GeminiService:
         website: str,
         research_summary: str,
         target_criteria: str,
-        target_industry: Optional[str] = None
+        target_industry: Optional[str] = None,
+        target_location: Optional[str] = None,
+        actual_location: Optional[str] = None,
+        service_offered: Optional[str] = None,
+        require_no_website: bool = False,
+        website_status: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Uses Gemini to analyze company research against target customer criteria.
-        Returns a structured assessment with score, reasoning, strengths, and risks.
+        Evaluates a prospective lead against target criteria with strict qualification gates:
+        Gate 1: Location & Industry match.
+        Gate 2: Minimum score threshold (>= 65/100). Low scores (< 65) are flagged UNQUALIFIED.
+        Gate 3: Website constraint check (if user requires no official website).
         """
-        if not self.is_configured():
-            return self._fallback_lead_analysis(company_name, target_criteria)
+        # --- GATE 1: Deterministic Geography & Constraint Checks ---
+        if target_location and actual_location:
+            t_loc = target_location.lower()
+            a_loc = actual_location.lower()
+            # If target asks for Ethiopia/Addis Ababa and lead is in US, reject immediately
+            if ("ethiopia" in t_loc or "addis" in t_loc) and not ("ethiopia" in a_loc or "addis" in a_loc):
+                return {
+                    "fit_score": 0,
+                    "fit_reason": f"Geographical mismatch: Prospect is located in {actual_location}, but requested geography is {target_location}.",
+                    "fit_strengths": [],
+                    "fit_risks": [f"Located in {actual_location} instead of {target_location}"],
+                    "status": "REJECTED_MISMATCH",
+                    "qualification_status": "REJECTED_MISMATCH",
+                    "is_qualified": False
+                }
 
-        prompt = f"""
-You are a senior B2B Sales Operations Specialist analyzing a potential business prospect for customer fit.
+        # If user explicitly requested businesses without an official website
+        if require_no_website:
+            if website_status == "HAS_OFFICIAL_WEBSITE":
+                return {
+                    "fit_score": 15,
+                    "fit_reason": f"Disqualified: Prospect already possesses an active official website ({website}). Not suitable for website development cold outreach.",
+                    "fit_strengths": [],
+                    "fit_risks": ["Already has dedicated official website domain"],
+                    "status": "UNQUALIFIED",
+                    "qualification_status": "UNQUALIFIED",
+                    "is_qualified": False
+                }
+            elif website_status == "NO_OFFICIAL_WEBSITE_FOUND":
+                return {
+                    "fit_score": 88,
+                    "fit_reason": (
+                        f"High Fit: Business is active in {actual_location or target_location} with online directory listings, "
+                        f"but has no official, dedicated website. Prime candidate for {service_offered or 'website development'}."
+                    ),
+                    "fit_strengths": [
+                        "Active business with verified directory presence",
+                        "No existing official website identified",
+                        f"Direct need for {service_offered or 'website development'}"
+                    ],
+                    "fit_risks": ["Contact details may require manual phone/directory verification"],
+                    "status": "QUALIFIED",
+                    "qualification_status": "QUALIFIED",
+                    "is_qualified": True
+                }
+            elif website_status == "WEBSITE_STATUS_UNCERTAIN":
+                return {
+                    "fit_score": 68,
+                    "fit_reason": f"Potential Fit: Official website status is currently uncertain. Business is verified in {target_location}, but requires human confirmation before dispatch.",
+                    "fit_strengths": [f"Operating in target geography ({target_location})"],
+                    "fit_risks": ["Website presence could not be verified with 100% certainty"],
+                    "status": "QUALIFIED",
+                    "qualification_status": "QUALIFIED",
+                    "is_qualified": True
+                }
 
-[TARGET CUSTOMER CRITERIA]
-Industry: {target_industry or 'General B2B Tech'}
-Criteria & Pain Points:
-{target_criteria}
+        # --- GATE 2: Gemini AI Evaluation ---
+        if self.is_configured():
+            prompt = f"""
+You are a strict, evidence-based B2B Sales Operations Specialist qualifying potential business prospects.
 
-[PROSPECT INFORMATION]
+[TARGET CRITERIA]
+Target Industry: {target_industry or 'General'}
+Target Location: {target_location or 'Any'}
+Service Being Offered: {service_offered or 'B2B Solutions'}
+Detailed Criteria: {target_criteria}
+
+[PROSPECT EVIDENCE]
 Company Name: {company_name}
-Website: {website}
-Company Research & Scraped Content:
-{research_summary[:3000]}
+Location: {actual_location or target_location}
+Website / Link: {website}
+Extracted Research / Landing Page Intel:
+{research_summary[:2500]}
 
-[TASK]
-Carefully evaluate how well this prospect matches the target criteria.
-Output MUST be a valid JSON object strictly matching this schema:
+[TASK & QUALIFICATION RULES]
+1. Evaluate whether this company genuinely matches the target industry, geography, and service need.
+2. A poor match (such as an established leader with no need, or an irrelevant business) MUST receive a low score (< 50) and status "UNQUALIFIED".
+3. A score of 65 or above requires concrete evidence from the prospect's profile supporting customer fit.
+4. Output MUST be valid JSON strictly matching:
 {{
-  "fit_score": <integer from 0 to 100>,
-  "fit_reason": "<2-3 sentence executive explanation of the score>",
-  "fit_strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "fit_risks": ["<risk or disqualifier 1>", "<risk or disqualifier 2>"],
+  "fit_score": <integer 0 to 100>,
+  "fit_reason": "<2-3 sentence explanation based strictly on provided facts>",
+  "fit_strengths": ["<factual strength 1>", "<factual strength 2>"],
+  "fit_risks": ["<risk or blocker 1>"],
   "status": "<'QUALIFIED' if fit_score >= 65 else 'UNQUALIFIED'>"
 }}
-
-Do not include markdown codeblocks or extra text outside the JSON.
+Do not include markdown backticks or extra text outside the JSON.
 """
-
-        try:
-            response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.2,
+            try:
+                response = self.client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.2,
+                    )
                 )
-            )
-            raw_text = response.text.strip()
-            # Clean possible markdown wrapping if any
-            if raw_text.startswith("```"):
-                lines = raw_text.splitlines()
-                if lines[0].startswith("```"):
-                    lines = lines[1:]
-                if lines and lines[-1].startswith("```"):
-                    lines = lines[:-1]
-                raw_text = "\n".join(lines).strip()
-            
-            data = json.loads(raw_text)
-            fit_score = int(data.get("fit_score", 50))
-            return {
-                "fit_score": fit_score,
-                "fit_reason": data.get("fit_reason", "Analysis completed."),
-                "fit_strengths": data.get("fit_strengths", []),
-                "fit_risks": data.get("fit_risks", []),
-                "status": "QUALIFIED" if fit_score >= 65 else "UNQUALIFIED"
-            }
-        except Exception as e:
-            logger.error(f"Gemini API error during lead analysis: {e}")
-            return self._fallback_lead_analysis(company_name, target_criteria, str(e))
+                raw_text = response.text.strip()
+                if raw_text.startswith("```"):
+                    lines = raw_text.splitlines()
+                    if lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].startswith("```"):
+                        lines = lines[:-1]
+                    raw_text = "\n".join(lines).strip()
+
+                data = json.loads(raw_text)
+                fit_score = int(data.get("fit_score", 40))
+                is_qual = fit_score >= 65
+                status = "QUALIFIED" if is_qual else "UNQUALIFIED"
+                return {
+                    "fit_score": fit_score,
+                    "fit_reason": data.get("fit_reason", "Evaluation completed."),
+                    "fit_strengths": data.get("fit_strengths", []),
+                    "fit_risks": data.get("fit_risks", []),
+                    "status": status,
+                    "qualification_status": status,
+                    "is_qualified": is_qual
+                }
+            except Exception as e:
+                logger.error(f"Gemini API error during qualification: {e}. Using deterministic evaluation.")
+
+        # Deterministic Rule-Based Fallback (never fabricates generic fake 78 score)
+        return self._deterministic_lead_analysis(
+            company_name=company_name,
+            target_industry=target_industry,
+            target_location=target_location,
+            actual_location=actual_location,
+            service_offered=service_offered,
+            research_summary=research_summary
+        )
+
+    def _deterministic_lead_analysis(
+        self,
+        company_name: str,
+        target_industry: Optional[str],
+        target_location: Optional[str],
+        actual_location: Optional[str],
+        service_offered: Optional[str],
+        research_summary: str
+    ) -> Dict[str, Any]:
+        """Strict deterministic fallback when AI API is unavailable."""
+        summary_lower = research_summary.lower()
+        score = 50
+        strengths = []
+        risks = []
+
+        if target_industry and target_industry.lower() in summary_lower:
+            strengths.append(f"Profile confirms operations in {target_industry}")
+            score += 25
+        elif target_industry:
+            score -= 30
+            risks.append(f"Industry mismatch: does not appear to operate in {target_industry}")
+
+        if actual_location and target_location and target_location.lower() in actual_location.lower():
+            strengths.append(f"Confirmed operations in target geography ({target_location})")
+            score += 15
+        elif actual_location and target_location:
+            score -= 40
+            risks.append(f"Geographic mismatch: located in {actual_location} instead of {target_location}")
+
+        score = max(0, min(100, score))
+        is_qual = score >= 65
+        status = "QUALIFIED" if is_qual else "UNQUALIFIED"
+        return {
+            "fit_score": score,
+            "fit_reason": f"Evaluated {company_name} in {actual_location or target_location} for {service_offered or 'B2B outreach'}.",
+            "fit_strengths": strengths,
+            "fit_risks": risks,
+            "status": status,
+            "qualification_status": status,
+            "is_qualified": is_qual
+        }
 
     def generate_outreach_email(
         self,
@@ -109,105 +227,135 @@ Do not include markdown codeblocks or extra text outside the JSON.
         website: str,
         research_summary: str,
         target_criteria: str,
+        service_offered: Optional[str] = None,
         contact_name: Optional[str] = None,
         contact_role: Optional[str] = None,
-        custom_instructions: Optional[str] = None
+        custom_instructions: Optional[str] = None,
+        website_status: Optional[str] = None
     ) -> Dict[str, str]:
         """
-        Generates a personalized, concise B2B cold outreach email draft.
+        Generates a personalized, concise B2B outreach email draft grounded strictly in real evidence.
+        Avoids invented stats, fake familiarity, or assumed meeting times.
         """
-        if not self.is_configured():
-            return self._fallback_outreach_email(company_name, contact_name, contact_role)
-
-        recipient_line = f"{contact_name} ({contact_role})" if contact_name and contact_role else (contact_name or "Decision Maker")
+        recipient_line = f"{contact_name} ({contact_role})" if contact_name and contact_role else (contact_name or "Manager / Owner")
         instructions = f"Additional instructions: {custom_instructions}" if custom_instructions else ""
 
-        prompt = f"""
-You are an expert B2B copywriter writing a high-converting, personalized 1-on-1 cold outreach email.
+        # Context-specific guidance
+        if website_status == "NO_OFFICIAL_WEBSITE_FOUND":
+            offer_context = (
+                f"The prospect is {company_name}, an active business with directory listings but no official dedicated website. "
+                f"We are reaching out to offer professional website development to enable direct customer inquiries, bookings, and brand credibility."
+            )
+        else:
+            offer_context = f"We are reaching out to discuss {service_offered or 'workflow automation and operations'}."
 
-[SENDER VALUE PROPOSITION / CRITERIA]
-{target_criteria}
+        if self.is_configured():
+            prompt = f"""
+You are an ethical, consultative B2B copywriter drafting an introduction email.
 
-[RECIPIENT COMPANY]
+[CONTEXT & OFFER]
+{offer_context}
+Criteria / Value Prop: {target_criteria}
+
+[PROSPECT EVIDENCE]
 Company: {company_name} ({website})
-Contact: {recipient_line}
-Research & Context:
+Recipient: {recipient_line}
+Research Evidence:
 {research_summary[:2000]}
 {instructions}
 
-[GUIDELINES]
-- Keep it under 150 words.
-- Professional, warm, non-spammy, and consultative.
-- Reference specific details about their company/product from the research.
-- Clear, low-friction call to action (e.g. 15-min chat next Tuesday).
+[STRICT GUIDELINES]
+- Under 130 words. Professional, respectful, and concise.
+- Reference ONLY verified details from the research.
+- DO NOT invent statistics (e.g. do NOT claim 'save 15 hours' or '10 hours a week').
+- DO NOT claim fake familiarity (e.g. do NOT say 'I have been following your growth for a long time').
+- DO NOT assume specific meeting availability (e.g. do NOT say 'Let's chat this Thursday at 2pm').
+- Include a low-pressure consultative call to action (e.g. asking if they would be open to a brief conversation).
 - Return strictly a valid JSON object matching:
 {{
-  "subject": "<Compelling, personalized subject line>",
+  "subject": "<Concise, relevant subject line>",
   "body": "<Email body in clean text with greeting and sign-off placeholder>"
 }}
-
-Do not include markdown wrappers or extraneous text outside the JSON.
+No markdown backticks or extra text outside JSON.
 """
-
-        try:
-            response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.4,
+            try:
+                response = self.client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.3,
+                    )
                 )
-            )
-            raw_text = response.text.strip()
-            if raw_text.startswith("```"):
-                lines = raw_text.splitlines()
-                if lines[0].startswith("```"):
-                    lines = lines[1:]
-                if lines and lines[-1].startswith("```"):
-                    lines = lines[:-1]
-                raw_text = "\n".join(lines).strip()
-            
-            data = json.loads(raw_text)
-            return {
-                "subject": data.get("subject", f"Quick question regarding {company_name}"),
-                "body": data.get("body", f"Hi {contact_name or 'there'},\n\nI noticed {company_name}'s recent work...")
-            }
-        except Exception as e:
-            logger.error(f"Gemini API error during email draft generation: {e}")
-            return self._fallback_outreach_email(company_name, contact_name, contact_role)
+                raw_text = response.text.strip()
+                if raw_text.startswith("```"):
+                    lines = raw_text.splitlines()
+                    if lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].startswith("```"):
+                        lines = lines[:-1]
+                    raw_text = "\n".join(lines).strip()
 
-    def _fallback_lead_analysis(self, company_name: str, target_criteria: str, error_note: str = "") -> Dict[str, Any]:
-        """Realistic fallback analysis when API key is missing or quota is exceeded."""
-        score = 78
-        return {
-            "fit_score": score,
-            "fit_reason": f"Evaluated {company_name} against target criteria '{target_criteria[:60]}...'. Company exhibits strong alignment with operational ICP requirements.",
-            "fit_strengths": [
-                f"Active product ecosystem matching target profile",
-                f"Identified leadership and technical roles in place",
-                f"Clear value alignment with automated sales ops"
-            ],
-            "fit_risks": [
-                f"Unconfirmed current toolchain integration"
-            ],
-            "status": "QUALIFIED"
-        }
+                data = json.loads(raw_text)
+                return {
+                    "subject": data.get("subject", f"Inquiry regarding {company_name}"),
+                    "body": data.get("body", f"Hello {contact_name or 'there'},\n\nI am contacting you regarding {company_name}...")
+                }
+            except Exception as e:
+                logger.error(f"Gemini API error during email draft generation: {e}")
 
-    def _fallback_outreach_email(self, company_name: str, contact_name: Optional[str] = None, contact_role: Optional[str] = None) -> Dict[str, str]:
-        recipient = contact_name or "there"
-        role_mention = f" as {contact_role}" if contact_role else ""
-        return {
-            "subject": f"Streamlining sales operations for {company_name}",
-            "body": f"""Hi {recipient},
+        # Deterministic Grounded Draft Fallback (no invented statistics)
+        return self._deterministic_outreach_email(
+            company_name=company_name,
+            service_offered=service_offered,
+            contact_name=contact_name,
+            contact_role=contact_role,
+            website_status=website_status
+        )
 
-I have been following {company_name}'s growth and noticed your focus on scaling B2B workflows{role_mention}.
+    def _deterministic_outreach_email(
+        self,
+        company_name: str,
+        service_offered: Optional[str],
+        contact_name: Optional[str],
+        contact_role: Optional[str],
+        website_status: Optional[str]
+    ) -> Dict[str, str]:
+        """Provides an honest, professional template grounded in verified business context."""
+        recipient = contact_name or "Team"
+        role_mention = f" ({contact_role})" if contact_role else ""
 
-Many growing tech companies spend 10+ hours a week manually researching prospects, verifying emails, and drafting customized outreach. We developed LeadFlow AI to automate company qualification and outreach preparation while keeping your team in 100% control of every message sent.
+        if website_status == "NO_OFFICIAL_WEBSITE_FOUND":
+            subject = f"Website and direct booking inquiries for {company_name}"
+            body = f"""Dear {recipient}{role_mention},
 
-Would you be open to a brief 10-minute conversation this Thursday to see how similar teams are saving 15+ hours each week?
+I came across {company_name}'s business listing while researching hospitality and travel accommodations in your area.
+
+I noticed that while {company_name} has a presence on third-party directories, you do not appear to have a dedicated official website for direct bookings and customer inquiries.
+
+We help independent hotels and businesses establish custom, mobile-friendly websites that allow guests to view rooms, book directly, and avoid third-party platform commissions.
+
+Would you be open to a brief introductory conversation to see if having a dedicated website would benefit {company_name}?
+
+Sincerely,
+Outreach Operations Team"""
+        else:
+            service = service_offered or "AI automation and workflow solutions"
+            subject = f"{service} for {company_name}"
+            body = f"""Hello {recipient}{role_mention},
+
+I am reaching out regarding {company_name}'s current operations. We provide {service} designed to help growing teams streamline operational workflows and reduce manual administrative overhead.
+
+Given your focus on delivering quality service, I wanted to see if exploring automated workflow integration would align with your team's priorities this quarter.
+
+If you are open to a brief introductory conversation, please let me know what day works best for you.
 
 Best regards,
-LeadFlow Operations Team"""
+Outreach Operations Team"""
+
+        return {
+            "subject": subject,
+            "body": body
         }
 
 

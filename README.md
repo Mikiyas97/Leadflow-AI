@@ -125,15 +125,51 @@ Copy `.env.example` to `.env`:
 cp .env.example .env
 ```
 
-Configure your API keys in `.env` (optional for demo mode):
+Configure your API keys and Gmail SMTP credentials in `.env`:
 ```env
+# AI & Enrichment Services
 GEMINI_API_KEY=your_gemini_api_key_here
 HUNTER_API_KEY=your_hunter_api_key_here
 FIRECRAWL_API_KEY=your_firecrawl_api_key_here
+
+# Gmail SMTP Email Integration
+GMAIL_USER=your-email@gmail.com
+GMAIL_APP_PASSWORD=your-16-character-app-password
+EMAIL_FROM=your-email@gmail.com
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+
+# App Settings
 DATABASE_URL=sqlite:///./leadflow.db
 FRONTEND_ORIGIN=http://localhost:5173
 PORT=8000
 ```
+
+### Gmail SMTP Setup Guide (Google App Password)
+
+To send approved outreach emails from LeadFlow AI using Gmail SMTP:
+
+> [!IMPORTANT]
+> **Never use your standard Google account password.** Gmail requires a dedicated 16-character **App Password** for SMTP authentication.
+
+1. **Enable 2-Step Verification:**
+   - Go to your [Google Account](https://myaccount.google.com/).
+   - Navigate to **Security** on the left menu.
+   - Under "How you sign in to Google", turn on **2-Step Verification** if not already enabled.
+
+2. **Generate an App Password:**
+   - In your Google Account Security tab, search for or click on **App passwords** (or visit [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)).
+   - Enter an app name, e.g., `LeadFlow AI`.
+   - Click **Create**. Google will display a 16-character password (e.g., `abcd efgh ijkl mnop`).
+
+3. **Configure Environment Variables:**
+   - Set `GMAIL_USER=your-email@gmail.com` in your backend `.env` file.
+   - Set `GMAIL_APP_PASSWORD=abcdefghijklmnop` (remove spaces).
+   - Set `EMAIL_FROM=your-email@gmail.com` (must match your authorized account).
+   - Keep credentials server-side only. Do not commit `.env` to Git or expose credentials to the client.
+
+4. **Verify Connection:**
+   - Click the **Test SMTP** button in the top navigation bar to send a test ping to your inbox and confirm connectivity before running campaigns.
 
 ### 2. Backend Installation & Startup
 
@@ -166,12 +202,12 @@ Open your browser at: `http://localhost:5173`
 
 ## 6. Running Tests
 
-Run the backend unit and integration test suite:
+Run the complete backend automated test suite (covering Acceptance Tests A–F, qualification gates, Hunter verification, duplicate prevention, and Gmail SMTP handling):
 ```bash
-.\backend\venv\Scripts\python.exe -m pytest backend/tests/test_api.py -v
+python -m pytest backend/tests/ -v
 ```
 
-Test the frontend TypeScript compilation and build:
+Test the frontend TypeScript compilation and production bundle build:
 ```bash
 cd frontend
 npm run build
@@ -184,6 +220,7 @@ npm run build
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/health` | Service health and integration status |
+| `POST` | `/api/chat` | Autonomous 8-step pipeline execution and criteria parsing |
 | `GET` | `/api/dashboard/stats` | High-level metrics and activity feed |
 | `POST` | `/api/target-profiles` | Create new ICP target profile |
 | `GET` | `/api/target-profiles` | List saved target profiles |
@@ -194,9 +231,11 @@ npm run build
 | `PATCH` | `/api/leads/{id}` | Update lead fields or status |
 | `POST` | `/api/leads/{id}/analyze` | Trigger re-analysis with Gemini |
 | `POST` | `/api/leads/{id}/draft` | Generate personalized email draft |
-| `GET` | `/api/drafts` | List outreach drafts (DRAFT / APPROVED) |
+| `GET` | `/api/drafts` | List outreach drafts (DRAFT / APPROVED / SENT) |
 | `PATCH` | `/api/drafts/{id}` | Edit email subject or body |
 | `POST` | `/api/drafts/{id}/approve` | Approve draft for human outreach |
+| `POST` | `/api/drafts/{id}/send` | Send approved email via Gmail SMTP (idempotent, schedules follow-up) |
+| `POST` | `/api/drafts/test-email` | Explicit test email dispatch to verify Gmail SMTP credentials |
 | `GET` | `/api/activity` | Retrieve execution logs and audit trail |
 
 ---

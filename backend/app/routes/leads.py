@@ -1,6 +1,7 @@
 """Leads API Router"""
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -219,3 +220,71 @@ def delete_lead(lead_id: int, db: Session = Depends(get_db)):
     db.delete(lead)
     db.commit()
     return None
+
+
+class RescheduleFollowUpRequest(BaseModel):
+    days: Optional[int] = None
+    date: Optional[str] = None
+    notes: Optional[str] = None
+    action_type: Optional[str] = None
+    status: Optional[str] = None
+
+
+@router.post("/{lead_id}/reschedule-followup")
+def reschedule_lead_followup(
+    lead_id: int,
+    payload: RescheduleFollowUpRequest,
+    db: Session = Depends(get_db)
+):
+    """Reschedule next follow-up date and manage follow-up operations for a lead (Step 8)."""
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    if payload.days is not None:
+        target_date = datetime.now(timezone.utc) + timedelta(days=payload.days)
+        lead.follow_up_date = target_date
+    elif payload.date:
+        try:
+            target_date = datetime.fromisoformat(payload.date.replace("Z", "+00:00"))
+            lead.follow_up_date = target_date
+        except Exception:
+            target_date = datetime.now(timezone.utc) + timedelta(days=3)
+            lead.follow_up_date = target_date
+    elif not lead.follow_up_date:
+        lead.follow_up_date = datetime.now(timezone.utc) + timedelta(days=3)
+
+    if payload.notes is not None:
+        lead.follow_up_notes = payload.notes
+
+    if payload.status is not None:
+        lead.follow_up_status = payload.status
+        if payload.status == "COMPLETED":
+            lead.status = "CONTACTED"
+
+    db.commit()
+    db.refresh(lead)
+
+    formatted_date = lead.follow_up_date.strftime("%b %d, %Y") if lead.follow_up_date else "Not set"
+    log_action = "FOLLOWUP_COMPLETED" if payload.status == "COMPLETED" else "FOLLOWUP_MANAGED"
+    action_desc = f" ({payload.action_type})" if payload.action_type else ""
+    notes_desc = f" Notes: '{payload.notes}'" if payload.notes else ""
+    status_desc = f" Status: {payload.status}." if payload.status else ""
+
+    db.add(ActivityLog(
+        lead_id=lead.id,
+        action=log_action,
+        level="INFO" if payload.status != "COMPLETED" else "SUCCESS",
+        details=f"Follow-up for {lead.company_name}{action_desc}: Scheduled for {formatted_date}.{status_desc}{notes_desc}"
+    ))
+    db.commit()
+
+    return {
+        "lead_id": lead.id,
+        "follow_up_date": formatted_date,
+        "raw_follow_up_date": lead.follow_up_date.isoformat() if lead.follow_up_date else None,
+        "follow_up_notes": lead.follow_up_notes,
+        "follow_up_status": lead.follow_up_status,
+        "status": lead.status
+    }
+
