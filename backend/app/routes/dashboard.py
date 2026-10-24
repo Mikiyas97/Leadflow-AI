@@ -33,7 +33,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         Lead.status != "ARCHIVED"
     )
     overdue_count = overdue_query.count()
-    overdue_rows = overdue_query.order_by(Lead.follow_up_date.asc()).limit(10).all()
+    overdue_rows = overdue_query.order_by(Lead.follow_up_date.asc()).limit(50).all()
 
     overdue_leads = []
     for lead in overdue_rows:

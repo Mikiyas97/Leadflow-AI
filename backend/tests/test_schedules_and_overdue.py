@@ -16,7 +16,7 @@ def test_fr09_overdue_followups_identification():
     db = SessionLocal()
     unique_domain = f"overdue-{uuid.uuid4().hex[:8]}.com"
     try:
-        past_date = datetime.utcnow() - timedelta(days=2)
+        past_date = datetime.utcnow() - timedelta(days=100)
         lead = Lead(
             company_name="Overdue Hospitality Corp",
             website=unique_domain,
