@@ -127,6 +127,7 @@ class AutomationRun(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     profile_id = Column(Integer, ForeignKey("target_profiles.id", ondelete="SET NULL"), nullable=True)
+    search_name = Column(String(255), nullable=True)
     # status: "RUNNING", "COMPLETED", "FAILED"
     status = Column(String(50), default="RUNNING", index=True)
     input_profile = Column(JSON, nullable=True)

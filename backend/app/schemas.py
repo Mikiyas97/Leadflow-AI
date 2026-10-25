@@ -188,6 +188,8 @@ class DiscoveryRunCreate(BaseModel):
 class DiscoveryRunResponse(BaseModel):
     id: int
     profile_id: Optional[int] = None
+    search_name: Optional[str] = None
+    input_profile: Optional[Dict[str, Any]] = None
     status: str
     leads_discovered: int
     leads_qualified: int

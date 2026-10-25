@@ -149,6 +149,8 @@ export interface LeadDetail extends Lead {
 export interface AutomationRun {
   id: number;
   profile_id?: number | null;
+  search_name?: string | null;
+  input_profile?: any;
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
   leads_discovered: number;
   leads_qualified: number;

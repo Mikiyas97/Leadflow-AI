@@ -16,7 +16,7 @@ from backend.app.models import (
     AutomationRun
 )
 from backend.app.services.gemini_service import gemini_service
-from backend.app.services.discovery_service import discovery_service
+from backend.app.services.discovery_service import discovery_service, derive_search_name
 from backend.app.services.firecrawl_service import firecrawl_service
 from backend.app.services.hunter_service import hunter_service
 from backend.app.services.pipeline_logger import pipeline_logger
@@ -390,8 +390,10 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
         )
 
         # Record automation run
+        search_name = derive_search_name(parsed_data)
         run = AutomationRun(
             status="RUNNING",
+            search_name=search_name,
             input_profile=parsed_data,
             started_at=datetime.now(timezone.utc)
         )

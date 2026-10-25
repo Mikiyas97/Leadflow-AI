@@ -14,9 +14,33 @@ import {
   ArrowRight,
   MapPin
 } from 'lucide-react';
-import type { DashboardStats, OverdueLeadItem } from '../types';
+import type { DashboardStats, OverdueLeadItem, AutomationRun } from '../types';
 import { api } from '../services/api';
 import type { ActiveTab } from './Sidebar';
+
+const getRunDisplayName = (run: AutomationRun): string => {
+  if (run.search_name && run.search_name.trim()) {
+    return run.search_name;
+  }
+  const ip = run.input_profile;
+  if (ip && typeof ip === 'object') {
+    if (ip.campaign_name) return ip.campaign_name;
+    if (ip.source) return ip.source;
+    const tb = ip.target_business;
+    const ind = ip.industry;
+    const loc = ip.location;
+    let biz = '';
+    if (Array.isArray(tb) && tb.length > 0) biz = tb.join(', ');
+    else if (typeof tb === 'string') biz = tb;
+    else if (ind) biz = ind;
+
+    if (biz && loc) return `${biz} in ${loc}`;
+    if (biz) return `${biz} Search`;
+    if (loc) return `Companies in ${loc}`;
+    if (ip.criteria) return String(ip.criteria).substring(0, 40);
+  }
+  return `Search #${run.id}`;
+};
 
 interface DashboardViewProps {
   stats: DashboardStats | null;
@@ -243,11 +267,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             : 'bg-amber-400'
                         }`}
                     />
-                    <div>
-                      <div className="text-xs font-bold text-white">
-                        Run #{run.id}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className="text-xs font-bold text-white group-hover:text-[#f95721] transition-colors truncate max-w-[240px] sm:max-w-[340px]"
+                          title={getRunDisplayName(run)}
+                        >
+                          {getRunDisplayName(run)}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#181824] text-slate-400 font-mono border border-[#262638] shrink-0">
+                          Run #{run.id}
+                        </span>
                       </div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-slate-400 mt-0.5">
                         {run.leads_discovered} leads found • {run.leads_qualified} qualified • {run.drafts_generated} drafts
                       </div>
                     </div>

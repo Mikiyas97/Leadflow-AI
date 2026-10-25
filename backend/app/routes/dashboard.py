@@ -7,6 +7,7 @@ from sqlalchemy import func
 from backend.app.database import get_db
 from backend.app.models import Lead, OutreachDraft, AutomationRun, ActivityLog
 from backend.app.schemas import DashboardStatsResponse
+from backend.app.services.discovery_service import derive_search_name
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -59,7 +60,26 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "qualification_rate": qualification_rate
     }
 
-    recent_runs = db.query(AutomationRun).order_by(AutomationRun.started_at.desc()).limit(5).all()
+    recent_runs_db = db.query(AutomationRun).order_by(AutomationRun.started_at.desc()).limit(10).all()
+    recent_runs = []
+    for r in recent_runs_db:
+        name = r.search_name or derive_search_name(r.input_profile, r.profile.name if r.profile else None, r.id)
+        if not r.search_name:
+            r.search_name = name
+            db.commit()
+        recent_runs.append({
+            "id": r.id,
+            "profile_id": r.profile_id,
+            "search_name": name,
+            "input_profile": r.input_profile,
+            "status": r.status,
+            "leads_discovered": r.leads_discovered,
+            "leads_qualified": r.leads_qualified,
+            "drafts_generated": r.drafts_generated,
+            "error_summary": r.error_summary,
+            "started_at": r.started_at,
+            "completed_at": r.completed_at
+        })
     recent_activities = db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(10).all()
 
     return {

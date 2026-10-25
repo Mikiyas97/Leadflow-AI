@@ -23,7 +23,7 @@ from backend.app.schemas import (
 )
 from backend.app.services.gemini_service import gemini_service
 from backend.app.services.firecrawl_service import firecrawl_service
-from backend.app.services.discovery_service import discovery_service
+from backend.app.services.discovery_service import discovery_service, derive_search_name
 from backend.app.services.hunter_service import hunter_service
 from backend.app.services.pipeline_logger import pipeline_logger
 
@@ -335,8 +335,10 @@ async def search_leads(payload: LeadSearchRequest, db: Session = Depends(get_db)
     score_threshold = payload.min_qualification_score
 
     # 1. Log Automation Run
+    search_name = (payload.campaign_name or "").strip() or derive_search_name(payload.model_dump())
     run = AutomationRun(
         status="RUNNING",
+        search_name=search_name,
         input_profile=payload.model_dump(),
         started_at=datetime.now(timezone.utc)
     )

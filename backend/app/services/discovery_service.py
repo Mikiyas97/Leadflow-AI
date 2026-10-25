@@ -1,5 +1,6 @@
 """LeadFlow AI - General-Purpose Lead Discovery Service with Live Search"""
 import logging
+import json
 import re
 from typing import List, Dict, Any, Optional
 
@@ -874,6 +875,66 @@ class DiscoveryService:
             }
         ]
         return [g for g in general_b2b if g["website"] not in excluded]
+
+
+def derive_search_name(input_profile: Any, profile_name: Optional[str] = None, default_id: Optional[int] = None) -> str:
+    """Generate a concise, human-friendly search name for an automation run based on criteria."""
+    if not input_profile:
+        if profile_name:
+            return profile_name
+        return f"Search #{default_id}" if default_id else "General Prospecting Search"
+
+    ip = input_profile
+    if isinstance(ip, str):
+        try:
+            ip = json.loads(ip)
+        except Exception:
+            return profile_name or (f"Search #{default_id}" if default_id else "General Prospecting Search")
+
+    if not isinstance(ip, dict):
+        return profile_name or (f"Search #{default_id}" if default_id else "General Prospecting Search")
+
+    cname = (ip.get("campaign_name") or "").strip()
+    if cname:
+        return cname
+
+    source = (ip.get("source") or "").strip()
+    if source:
+        return source
+
+    tb = ip.get("target_business")
+    ind = (ip.get("industry") or "").strip()
+    loc = (ip.get("location") or "").strip()
+    crit = (ip.get("criteria") or "").strip()
+    svc = (ip.get("service_offered") or "").strip()
+    prompt = (ip.get("raw_prompt") or "").strip()
+
+    business = ""
+    if tb and isinstance(tb, list) and len(tb) > 0:
+        business = ", ".join([str(b).strip() for b in tb if str(b).strip()])
+    elif tb and isinstance(tb, str):
+        business = tb.strip()
+    elif ind:
+        business = ind
+    elif svc and svc.lower() not in ("general b2b services", "none"):
+        business = svc
+
+    if business and loc:
+        return f"{business} in {loc}"
+    elif business:
+        return f"{business} Search"
+    elif loc:
+        return f"Companies in {loc}"
+    elif crit:
+        return crit[:45] + ("..." if len(crit) > 45 else "")
+    elif prompt:
+        cleaned = re.sub(r'^(?:find|search for|locate|get|discover|best one|top|\s+)*', '', prompt, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r'\s+and prepare.*$', '', cleaned, flags=re.IGNORECASE).strip()
+        return (cleaned[:45].strip().title() if cleaned else prompt[:45]) + ("..." if len(cleaned) > 45 else "")
+    elif profile_name:
+        return profile_name
+
+    return f"Search #{default_id}" if default_id else "General Prospecting Search"
 
 
 discovery_service = DiscoveryService()

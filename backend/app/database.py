@@ -41,7 +41,8 @@ def init_db():
             "ALTER TABLE leads ADD COLUMN website_status VARCHAR(50) DEFAULT 'HAS_OFFICIAL_WEBSITE'",
             "ALTER TABLE outreach_drafts ADD COLUMN sent_at DATETIME",
             "ALTER TABLE outreach_drafts ADD COLUMN send_error TEXT",
-            "ALTER TABLE outreach_drafts ADD COLUMN idempotency_key VARCHAR(255)"
+            "ALTER TABLE outreach_drafts ADD COLUMN idempotency_key VARCHAR(255)",
+            "ALTER TABLE automation_runs ADD COLUMN search_name VARCHAR(255)"
         ]:
             try:
                 conn.execute(text(stmt))
