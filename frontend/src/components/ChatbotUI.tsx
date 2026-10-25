@@ -34,6 +34,7 @@ import {
 import type { ChatMessage, ChatSession, PipelineLead, LeadSearchRequest } from '../types';
 import { api } from '../services/api';
 import { LeadDetailModal } from './LeadDetailModal';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 const cleanDomain = (website?: string | null): string => {
   if (!website) return '';
@@ -855,9 +856,13 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
                       }`}
                   >
                     {/* Content text */}
-                    <div className="whitespace-pre-wrap font-sans space-y-2 text-slate-200 leading-relaxed">
-                      {msg.content}
-                    </div>
+                    {isUser ? (
+                      <div className="whitespace-pre-wrap font-sans text-slate-100 leading-relaxed">
+                        {msg.content}
+                      </div>
+                    ) : (
+                      <MarkdownRenderer content={msg.content} />
+                    )}
 
                     {/* Inline Lead Search Form fallback */}
                     {msg.show_form && (
