@@ -323,6 +323,8 @@ class PipelineLead(BaseModel):
     industry: Optional[str] = None
     location: Optional[str] = None
     company_size: Optional[str] = None
+    description: Optional[str] = None
+    email_count: Optional[int] = None
     website_status: Optional[str] = "HAS_OFFICIAL_WEBSITE"
     website_evidence: Optional[str] = None
     fit_score: int

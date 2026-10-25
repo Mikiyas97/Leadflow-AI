@@ -21,21 +21,269 @@ import {
   Building2,
   MapPin,
   Zap,
-  History,
   AlertTriangle,
   XCircle,
   Globe,
   Search,
   KeyRound,
-  Plus
+  Plus,
+  Sliders,
+  CheckCheck,
+  Crown
 } from 'lucide-react';
-import type { ChatMessage, ChatSession, PipelineLead, ActivityLog } from '../types';
+import type { ChatMessage, ChatSession, PipelineLead, LeadSearchRequest } from '../types';
 import { api } from '../services/api';
+import { LeadDetailModal } from './LeadDetailModal';
+
+const cleanDomain = (website?: string | null): string => {
+  if (!website) return '';
+  let d = website.trim().toLowerCase();
+  d = d.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '');
+  return d.split('/')[0];
+};
+
+const formatEmailCount = (lead: PipelineLead): number => {
+  return lead.contacts?.length || lead.email_count || 0;
+};
+
+const getWebsiteStatusBadge = (status?: string | null) => {
+  if (status === 'NO_OFFICIAL_WEBSITE_FOUND') {
+    return {
+      label: 'No Official Website',
+      className: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    };
+  }
+  if (status === 'WEBSITE_STATUS_UNCERTAIN') {
+    return {
+      label: 'Website Uncertain',
+      className: 'bg-slate-700/50 text-slate-300 border-slate-600',
+    };
+  }
+  return {
+    label: 'Active Web',
+    className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  };
+};
+
+interface InlineLeadSearchFormProps {
+  initialCriteria?: LeadSearchRequest | null;
+  onSubmit: (criteria: LeadSearchRequest) => void;
+  isLoading: boolean;
+}
+
+export const InlineLeadSearchForm: React.FC<InlineLeadSearchFormProps> = ({
+  initialCriteria,
+  onSubmit,
+  isLoading,
+}) => {
+  const [targetBusiness, setTargetBusiness] = useState<string>(
+    initialCriteria?.target_business?.[0] || 'Web Development'
+  );
+  const [location, setLocation] = useState<string>(
+    initialCriteria?.location || 'Addis Ababa, Ethiopia'
+  );
+  const [leadQuantity, setLeadQuantity] = useState<number>(
+    initialCriteria?.lead_quantity || 1
+  );
+  const [serviceOffered, setServiceOffered] = useState<string>(
+    initialCriteria?.service_offered || 'AI Workflow Automation & Operations'
+  );
+  const [websiteStatus, setWebsiteStatus] = useState<string>(
+    initialCriteria?.website_status || 'Any'
+  );
+  const [minScore, setMinScore] = useState<number>(
+    initialCriteria?.min_qualification_score || 60
+  );
+
+  const businessChips = [
+    'Web Development',
+    'Hotels',
+    'B2B SaaS',
+    'FinTech',
+    'Healthcare',
+  ];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLoading) return;
+    onSubmit({
+      campaign_name: 'Chat Lead Discovery',
+      target_business: [targetBusiness.trim()],
+      location: location.trim(),
+      lead_quantity: Number(leadQuantity),
+      service_offered: serviceOffered.trim(),
+      website_status: websiteStatus,
+      min_qualification_score: Number(minScore),
+      decision_makers: ['Founder & CEO', 'Managing Director', 'Owner'],
+      company_size: 'Any',
+    });
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="mt-3.5 bg-[#0d0d12] border border-[#28283a] rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xl animate-fade-in"
+    >
+      <div className="flex items-center justify-between border-b border-[#1c1c28] pb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="h-7 w-7 rounded-lg bg-[#f95721]/15 border border-[#f95721]/30 flex items-center justify-center text-[#f95721]">
+            <Sliders className="w-4 h-4" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-white tracking-wide">
+              LeadFlow Prospecting Search Form
+            </h4>
+            <p className="text-[10px] text-slate-400">
+              Customize criteria to discover, qualify, and prepare outreach for matching leads
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#181824] text-slate-300 border border-[#2a2a38]">
+          Interactive Search
+        </span>
+      </div>
+
+      {/* Target Business Type */}
+      <div className="space-y-1.5">
+        <label className="text-[11px] font-semibold text-slate-300">
+          Target Business / Industry
+        </label>
+        <div className="flex flex-wrap gap-1.5">
+          {businessChips.map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => setTargetBusiness(chip)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${targetBusiness === chip
+                  ? 'bg-[#f95721] text-white shadow-sm'
+                  : 'bg-[#161620] hover:bg-[#20202c] text-slate-300 border border-[#282838]'
+                }`}
+            >
+              {chip}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          value={targetBusiness}
+          onChange={(e) => setTargetBusiness(e.target.value)}
+          placeholder="e.g. Web Development or Hotels"
+          className="w-full mt-1.5 px-3 py-2 rounded-xl bg-[#14141c] border border-[#282838] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f95721]"
+          required
+        />
+      </div>
+
+      {/* Grid: Location & Quantity */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+            <MapPin className="w-3.5 h-3.5 text-[#f95721]" />
+            Target Geography
+          </label>
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Addis Ababa, Ethiopia"
+            className="w-full px-3 py-2 rounded-xl bg-[#14141c] border border-[#282838] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f95721]"
+            required
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            Lead Quantity
+          </label>
+          <select
+            value={leadQuantity}
+            onChange={(e) => setLeadQuantity(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-xl bg-[#14141c] border border-[#282838] text-xs text-white focus:outline-none focus:border-[#f95721] cursor-pointer"
+          >
+            <option value={1}>1 Best Qualified Company</option>
+            <option value={3}>Top 3 Qualified Candidates</option>
+            <option value={5}>5 Qualified Candidates</option>
+            <option value={10}>10 Candidates</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Service Pitch */}
+      <div className="space-y-1.5">
+        <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+          <Zap className="w-3.5 h-3.5 text-emerald-400" />
+          Service Offered / Pitch Proposition
+        </label>
+        <input
+          type="text"
+          value={serviceOffered}
+          onChange={(e) => setServiceOffered(e.target.value)}
+          placeholder="e.g. AI Workflow Automation & Operations or Website Development"
+          className="w-full px-3 py-2 rounded-xl bg-[#14141c] border border-[#282838] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#f95721]"
+          required
+        />
+      </div>
+
+      {/* Website Status & Min Score */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1">
+            <Globe className="w-3.5 h-3.5 text-blue-400" />
+            Website Status
+          </label>
+          <select
+            value={websiteStatus}
+            onChange={(e) => setWebsiteStatus(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-[#14141c] border border-[#282838] text-xs text-white focus:outline-none focus:border-[#f95721] cursor-pointer"
+          >
+            <option value="Any">Any Website Status</option>
+            <option value="Missing">Must Lack Official Website</option>
+            <option value="Outdated">Outdated Website</option>
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-semibold text-slate-300">Min Fit Threshold</span>
+            <span className="font-mono text-[#f95721] font-bold">{minScore}%</span>
+          </div>
+          <input
+            type="range"
+            min={40}
+            max={90}
+            step={5}
+            value={minScore}
+            onChange={(e) => setMinScore(Number(e.target.value))}
+            className="w-full accent-[#f95721] bg-[#1a1a24] rounded-lg cursor-pointer"
+          />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#f95721] via-[#ff6a38] to-[#f95721] hover:from-[#ea4710] hover:to-[#ea4710] text-white font-bold text-xs shadow-lg shadow-[#f95721]/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+        {isLoading ? (
+          <>
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            <span>Executing 8-Step Sales Ops Pipeline...</span>
+          </>
+        ) : (
+          <>
+            <Zap className="w-4 h-4 fill-current" />
+            <span>Find Best Lead & Prepare Outreach</span>
+          </>
+        )}
+      </button>
+    </form>
+  );
+};
 
 const QUICK_PROMPTS = [
   "SaaS companies in the United States that may need AI automation",
-  "Find 5 software companies without an official website and draft website-development emails",
-  "Find B2B fintech startups in California that may need AI automation",
+  "find best one a company that give web development service in addis ababa and prepare outreach email",
+  "skilyhotel for a lead",
 ];
 
 interface SendEmailModalState {
@@ -110,10 +358,7 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
   const [isSendingTestEmail, setIsSendingTestEmail] = useState<boolean>(false);
   const [testEmailFeedback, setTestEmailFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Activity Log Drawer state
-  const [isActivityDrawerOpen, setIsActivityDrawerOpen] = useState<boolean>(false);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
+  const [selectedProfileLead, setSelectedProfileLead] = useState<PipelineLead | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -126,21 +371,7 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
     scrollToBottom();
   }, [messages, isLoading]);
 
-  useEffect(() => {
-    loadActivityLogs();
-  }, []);
-
-  const loadActivityLogs = async () => {
-    try {
-      setIsLoadingLogs(true);
-      const logs = await api.getActivityLogs(30);
-      setActivityLogs(logs);
-    } catch {
-      // ignore
-    } finally {
-      setIsLoadingLogs(false);
-    }
-  };
+  const loadActivityLogs = () => {};
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || input).trim();
@@ -181,6 +412,57 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
         pipeline_leads: response.pipeline_leads as PipelineLead[] | undefined,
         qualified_count: response.qualified_count,
         total_candidates: response.total_candidates,
+        show_form: response.show_form,
+        suggested_form_criteria: response.suggested_form_criteria,
+      };
+
+      updateMessages((prev) => [...prev, agentMessage]);
+      loadActivityLogs();
+    } catch (err: any) {
+      const errorMessage: ChatMessage = {
+        id: `err-${Date.now()}`,
+        role: 'assistant',
+        content: `Connection error: ${err.message || 'Agent backend unavailable'}. Please verify that the server is running.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      updateMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
+
+  const handleSendWithCriteria = async (criteria: LeadSearchRequest) => {
+    const text = `Find ${criteria.lead_quantity} ${criteria.target_business.join(', ')} in ${criteria.location} and prepare outreach email`;
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    updateMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      const history = [...messages, userMessage].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const response = await api.sendChat(history, criteria);
+
+      const agentMessage: ChatMessage = {
+        id: `agent-${Date.now()}`,
+        role: 'assistant',
+        content: response.content,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        parsed_criteria: response.parsed_criteria,
+        pipeline_leads: response.pipeline_leads as PipelineLead[] | undefined,
+        qualified_count: response.qualified_count,
+        total_candidates: response.total_candidates,
+        show_form: response.show_form,
+        suggested_form_criteria: response.suggested_form_criteria,
       };
 
       updateMessages((prev) => [...prev, agentMessage]);
@@ -356,6 +638,15 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
 
       setSendModal(null);
       loadActivityLogs();
+
+      // Notify user with exact confirmation message requested by prompt
+      const successConfirmationMsg: ChatMessage = {
+        id: `agent-sent-${Date.now()}`,
+        role: 'assistant',
+        content: `Good! I sent the email to **${sendModal.companyName}** (${recipient}). Is there anything else I should do?`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      updateMessages((prev) => [...prev, successConfirmationMsg]);
     } catch (err: any) {
       setSendModal((prev) =>
         prev
@@ -474,14 +765,6 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
               <span className="font-medium text-[11px]">New Chat</span>
             </button>
           )}
-
-          <button
-            onClick={() => setIsActivityDrawerOpen(true)}
-            className="p-1.5 rounded-lg bg-[#14141c] hover:bg-[#1c1c26] border border-[#22222e] text-slate-400 hover:text-white transition-colors"
-            title="Activity Audit Log"
-          >
-            <History className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
@@ -575,6 +858,35 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
                     <div className="whitespace-pre-wrap font-sans space-y-2 text-slate-200 leading-relaxed">
                       {msg.content}
                     </div>
+
+                    {/* Inline Lead Search Form fallback */}
+                    {msg.show_form && (
+                      <InlineLeadSearchForm
+                        initialCriteria={msg.suggested_form_criteria}
+                        onSubmit={(crit) => handleSendWithCriteria(crit)}
+                        isLoading={isLoading}
+                      />
+                    )}
+
+                    {/* Post-send follow-up chips */}
+                    {msg.content && (msg.content.includes("Good! I sent the email") || msg.content.includes("Good! I sent the outreach email")) && (
+                      <div className="mt-3.5 pt-3 border-t border-[#22222e] flex flex-wrap gap-2 animate-fade-in">
+                        <button
+                          onClick={() => handleSend("Schedule follow-up check-in in 3 days")}
+                          className="px-3 py-1.5 rounded-lg bg-[#181822] hover:bg-[#222230] border border-[#2b2b3a] text-slate-300 hover:text-white text-xs font-medium transition-colors flex items-center gap-1.5"
+                        >
+                          <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Schedule follow-up in 3 days</span>
+                        </button>
+                        <button
+                          onClick={() => handleSend("Find another company in Addis Ababa and prepare outreach email")}
+                          className="px-3 py-1.5 rounded-lg bg-[#181822] hover:bg-[#222230] border border-[#2b2b3a] text-slate-300 hover:text-white text-xs font-medium transition-colors flex items-center gap-1.5"
+                        >
+                          <Search className="w-3.5 h-3.5 text-[#f95721]" />
+                          <span>Find another company in Addis Ababa</span>
+                        </button>
+                      </div>
+                    )}
 
                     {/* Criteria Banner (shown when parsed_criteria exists) */}
                     {msg.parsed_criteria && (
@@ -712,155 +1024,179 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
                                 key={lead.id}
                                 className="rounded-2xl bg-[#16161c] border border-[#2b2b36] p-4 sm:p-5 space-y-4 shadow-xl"
                               >
-                                {/* Step 2: Company Discovery Header */}
-                                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#252532] pb-3">
-                                  <div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#f95721]/20 text-[#f95721] border border-[#f95721]/30">
-                                        PROSPECT #{idx + 1}
-                                      </span>
-                                      <h3 className="text-base font-bold text-white flex items-center gap-1.5">
-                                        <Building2 className="w-4 h-4 text-slate-400" />
-                                        {lead.company_name}
-                                      </h3>
+                                {/* Panel Top Row: Logo, Name, Email Count, Lead Profile Button */}
+                                <div className="p-4 sm:p-5 pb-3 border-b border-[#22222e]">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-3.5">
+                                      {/* Large Favicon / Logo */}
+                                      <div className="w-12 h-12 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0 border border-slate-200 shadow-md overflow-hidden">
+                                        {cleanDomain(lead.website) ? (
+                                          <img
+                                            src={`https://www.google.com/s2/favicons?domain=${cleanDomain(lead.website)}&sz=128`}
+                                            alt={lead.company_name}
+                                            className="w-9 h-9 object-contain"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none';
+                                              if (e.currentTarget.parentElement) {
+                                                e.currentTarget.parentElement.innerHTML = `<span class="font-bold text-sm text-slate-900">${lead.company_name.substring(0, 2).toUpperCase()}</span>`;
+                                              }
+                                            }}
+                                          />
+                                        ) : (
+                                          <Building2 className="w-7 h-7 text-slate-800" />
+                                        )}
+                                      </div>
 
-                                      {/* Website Status Badge */}
-                                      {lead.website_status === 'NO_OFFICIAL_WEBSITE_FOUND' ? (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                                          <AlertTriangle className="w-3 h-3 text-amber-400" />
-                                          No Official Website Found
-                                        </span>
-                                      ) : lead.website_status === 'WEBSITE_STATUS_UNCERTAIN' ? (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-700/50 text-slate-300 border border-slate-600 flex items-center gap-1">
-                                          <Globe className="w-3 h-3 text-slate-400" />
-                                          Website Status Uncertain
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                                          <Check className="w-3 h-3 text-emerald-400" />
-                                          Official Website Verified
-                                        </span>
-                                      )}
+                                      <div>
+                                        <h3 className="text-base font-bold text-white flex items-center gap-2 flex-wrap">
+                                          <span>{lead.company_name}</span>
+                                          {lead.fit_score !== undefined && lead.fit_score !== null && (
+                                            <span
+                                              className={`text-[11px] px-2 py-0.5 rounded-md border font-semibold ${
+                                                lead.fit_score >= 65
+                                                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                                  : 'bg-rose-500/10 border-rose-500/25 text-rose-300'
+                                              }`}
+                                            >
+                                              Qualified {lead.fit_score}%
+                                            </span>
+                                          )}
+                                        </h3>
+
+                                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                          {(() => {
+                                            const badge = getWebsiteStatusBadge(lead.website_status);
+                                            return (
+                                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-medium ${badge.className}`}>
+                                                {badge.label}
+                                              </span>
+                                            );
+                                          })()}
+                                          <div className="inline-block px-2.5 py-0.5 rounded-md bg-[#1c1c28] border border-[#2c2c3e] text-xs font-semibold text-slate-200 shadow-sm">
+                                            {formatEmailCount(lead)} emails
+                                          </div>
+                                        </div>
+                                      </div>
                                     </div>
 
-                                    <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
-                                      {lead.website ? (
-                                        <a
-                                          href={`https://${lead.website}`}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="inline-flex items-center gap-1 text-[#f95721] hover:underline font-mono"
-                                        >
-                                          <span>{lead.website}</span>
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                      ) : (
-                                        <span className="text-amber-400 italic">No official domain</span>
-                                      )}
-                                      <span>•</span>
-                                      <span className="flex items-center gap-1">
-                                        <MapPin className="w-3 h-3 text-slate-500" />
-                                        {lead.location || 'Target Location'}
-                                      </span>
-                                      <span>•</span>
-                                      <span className="text-slate-300">{lead.industry || 'B2B'}</span>
-                                    </div>
-
-                                  </div>
-
-                                  {/* Gemini Fit Score Gauge */}
-                                  <div className="text-right">
-                                    <div className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
-                                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                                      <span>{lead.fit_score}/100 QUALIFIED</span>
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 mt-1">
-                                      Google Gemini Fit Score
+                                    {/* Action: Open Lead Profile Modal */}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedProfileLead(lead)}
+                                        className="px-2.5 py-1 rounded-lg bg-[#181824] hover:bg-[#222232] border border-[#2a2a3e] text-slate-300 hover:text-white text-xs font-medium transition-colors"
+                                        title="Open complete lead detail modal"
+                                      >
+                                        Lead Profile
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* Step 3: Firecrawl Website Research */}
-                                <div className="bg-[#101014] rounded-xl p-3 border border-[#20202a] text-[11px] text-slate-300 space-y-1.5">
-                                  <div className="flex items-center justify-between">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
-                                      <Flame className="w-3.5 h-3.5 text-[#f95721]" />
-                                      <span>Step 3 • Firecrawl Website Intel Extraction</span>
-                                    </div>
-                                    <button
-                                      onClick={() => toggleResearch(lead.id)}
-                                      className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1"
-                                    >
-                                      <span>{isResearchOpen ? 'Hide Full Intel' : 'View Extracted Intel'}</span>
-                                      {isResearchOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                    </button>
-                                  </div>
-
-                                  <p className="text-slate-300 font-sans leading-relaxed">
-                                    {lead.research_summary}
+                                {/* Company Description */}
+                                <div className="p-4 sm:p-5 pt-3.5 space-y-3">
+                                  <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                                    {lead.description || lead.research_summary || 'No company description available.'}
                                   </p>
 
-                                  {isResearchOpen && (
-                                    <div className="mt-2 pt-2 border-t border-[#1c1c24] text-[10px] text-slate-400 bg-[#0c0c0e] p-2.5 rounded-lg space-y-1 font-mono">
-                                      <div className="text-emerald-400 font-sans font-semibold">Firecrawl Markdown Intel Summary:</div>
-                                      <div>Primary Target: Evaluated against criteria and web presence signals.</div>
-                                      <div>Source Verified: {lead.website ? `https://${lead.website}` : 'Online Directory Search'}</div>
-                                    </div>
-                                  )}
-                                </div>
-
-
-                                {/* Step 5: Hunter.io Discovered Contacts */}
-                                <div className="bg-[#101014] rounded-xl p-3 border border-[#20202a] space-y-2 text-[11px]">
-                                  <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
-                                    <User className="w-3.5 h-3.5 text-[#f95721]" />
-                                    <span>Step 5 • Hunter.io Contact Discovery</span>
-                                  </div>
-
-                                  {lead.contacts && lead.contacts.length > 0 && lead.contacts[0].email ? (
-                                    <div className="flex flex-wrap items-center justify-between gap-2 bg-[#15151c] p-2.5 rounded-lg border border-[#252532]">
-                                      <div>
-                                        <div className="font-bold text-white text-xs">
-                                          {lead.contacts[0].name}
-                                        </div>
-                                        <div className="text-[11px] text-slate-400">
-                                          {lead.contacts[0].job_title || 'Decision Maker'}
-                                        </div>
+                                  {/* Company Details Grid (Two Columns matching SearchLeadsView) */}
+                                  <div className="pt-3 border-t border-[#1c1c28] grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6 text-xs">
+                                    <div className="space-y-1">
+                                      <div className="text-slate-200 font-medium">
+                                        {lead.industry || 'Not specified'}
                                       </div>
+                                      <div className="text-slate-400">
+                                        {lead.company_size || 'Not specified'}
+                                      </div>
+                                    </div>
 
-                                      <div className="flex items-center gap-2">
-                                        <div className="text-right">
-                                          <div className="text-xs font-mono text-emerald-400 font-semibold">
-                                            {lead.contacts[0].email}
-                                          </div>
-                                          <div className="text-[10px] text-slate-500">
-                                            {lead.contacts[0].confidence_score || 90}% confidence • {lead.contacts[0].email_status}
-                                          </div>
-                                        </div>
-                                        <button
-                                          onClick={() => handleCopy(`email-${lead.id}`, lead.contacts[0].email!)}
-                                          className="p-1.5 rounded-md bg-[#20202a] hover:bg-[#2b2b38] text-slate-300 hover:text-white transition-colors"
-                                          title="Copy email address"
+                                    <div className="space-y-1">
+                                      {lead.website && (
+                                        <a
+                                          href={`https://${cleanDomain(lead.website)}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1.5"
                                         >
-                                          {copiedId === `email-${lead.id}` ? (
-                                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                          ) : (
-                                            <Copy className="w-3.5 h-3.5" />
-                                          )}
-                                        </button>
+                                          <Globe className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                          <span className="font-mono">{cleanDomain(lead.website)}</span>
+                                        </a>
+                                      )}
+                                      <div className="text-slate-400 flex items-start gap-1.5">
+                                        <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
+                                        <span>{lead.location || 'Location not specified'}</span>
                                       </div>
                                     </div>
-                                  ) : (
-                                    <div className="p-2.5 rounded-lg bg-[#14141a] border border-[#202028] text-slate-400 flex items-center justify-between">
-                                      <span className="text-[11px]">
-                                        No verified email found via Hunter.io (Confidence &lt; 80% or domain unlisted). Manual recipient entry available on send.
-                                      </span>
-                                      <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">
-                                        Manual Entry
-                                      </span>
-                                    </div>
-                                  )}
+                                  </div>
                                 </div>
+
+                                {/* Hunter.io Verified Contacts Explorer Section */}
+                                {lead.contacts && lead.contacts.length > 0 && (
+                                  <div className="p-4 sm:p-5 pt-3 space-y-2.5">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-300 font-semibold">
+                                        <strong className="text-white">{formatEmailCount(lead)} results</strong> for {cleanDomain(lead.website) || lead.company_name}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500 font-mono">Hunter.io Verified</span>
+                                    </div>
+
+                                    <div className="border border-[#1e1e28] rounded-xl overflow-hidden divide-y divide-[#1e1e28] bg-[#0f0f14]">
+                                      {lead.contacts.map((contact, cIdx) => (
+                                        <div
+                                          key={cIdx}
+                                          className="px-3.5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-[#151520] transition-colors group"
+                                        >
+                                          <div className="flex items-center gap-2.5 min-w-0">
+                                            <input
+                                              type="checkbox"
+                                              defaultChecked
+                                              className="w-3.5 h-3.5 rounded text-[#f95721] focus:ring-0 bg-[#14141c] border-[#333346] cursor-pointer"
+                                            />
+                                            <div>
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-bold text-xs text-white">
+                                                  {contact.name}
+                                                </span>
+                                                {contact.job_title && (
+                                                  <>
+                                                    <span className="text-slate-500 text-xs">|</span>
+                                                    <span className="text-xs text-slate-300">
+                                                      {contact.job_title}
+                                                    </span>
+                                                  </>
+                                                )}
+                                              </div>
+                                              {contact.email && (
+                                                <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5 font-mono">
+                                                  <span>{contact.email}</span>
+                                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-sans">
+                                                    <Check className="w-2.5 h-2.5" />
+                                                    <span>{contact.confidence_score ? `${contact.confidence_score}% verified` : 'verified'}</span>
+                                                  </span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {contact.email && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCopy(`email-${lead.id}-${cIdx}`, contact.email!)}
+                                              className="p-1.5 rounded-lg bg-[#181824] hover:bg-[#222230] border border-[#262638] text-slate-400 hover:text-white transition-colors self-end sm:self-center"
+                                              title="Copy email address"
+                                            >
+                                              {copiedId === `email-${lead.id}-${cIdx}` ? (
+                                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                              ) : (
+                                                <Copy className="w-3.5 h-3.5" />
+                                              )}
+                                            </button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
 
                                 {/* Step 6 & 7: Gemini Outreach Email Draft & Human Review */}
                                 {lead.draft && (
@@ -957,6 +1293,34 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
                                             <div>{lead.draft.send_error}</div>
                                           </div>
                                         )}
+                                      </div>
+                                    )}
+
+                                    {/* Explicit Approval Authorization Callout Banner */}
+                                    {!isSent && !isEditing && (
+                                      <div className="p-3.5 rounded-xl bg-gradient-to-r from-[#171412] via-[#241712] to-[#171412] border border-[#f95721]/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                        <div className="flex items-center gap-2 text-white font-medium">
+                                          <Sparkles className="w-4 h-4 text-[#f95721] shrink-0" />
+                                          <span>👉 Please review the prepared email above. Would you like me to approve and send this email now?</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          {!isApproved && (
+                                            <button
+                                              onClick={() => handleApproveDraft(msg.id, lead.id, lead.draft!.id)}
+                                              className="px-3 py-1.5 rounded-lg bg-[#222230] hover:bg-[#2c2c3e] border border-[#36364a] text-slate-200 font-semibold text-xs transition-colors flex items-center gap-1.5"
+                                            >
+                                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                              <span>Approve Draft</span>
+                                            </button>
+                                          )}
+                                          <button
+                                            onClick={() => openSendModal(lead)}
+                                            className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#f95721] to-[#ff7438] hover:from-[#ea4710] hover:to-[#f95721] text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+                                          >
+                                            <Send className="w-3.5 h-3.5" />
+                                            <span>Send via Gmail SMTP</span>
+                                          </button>
+                                        </div>
                                       </div>
                                     )}
 
@@ -1156,20 +1520,11 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
                                   )}
 
                                   {/* Audit Log Transparency Badge */}
-                                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                                  <div className="flex items-center text-[10px] text-slate-400 pt-1">
                                     <span className="flex items-center gap-1 text-emerald-400">
                                       <CheckCircle2 className="w-3 h-3" />
                                       Activity automatically logged in database audit trail
                                     </span>
-                                    <button
-                                      onClick={() => {
-                                        setIsActivityDrawerOpen(true);
-                                        loadActivityLogs();
-                                      }}
-                                      className="text-slate-400 hover:text-white underline"
-                                    >
-                                      View Audit Log
-                                    </button>
                                   </div>
                                 </div>
                               </div>
@@ -1461,90 +1816,15 @@ export const ChatbotUI: React.FC<ChatbotUIProps> = ({
         </div>
       )}
 
-      {/* Activity Log Slide-over Drawer */}
-      {isActivityDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-[#0e0e12] border-l border-[#22222c] h-full flex flex-col p-5 shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between pb-4 border-b border-[#1f1f28]">
-              <div className="flex items-center gap-2">
-                <History className="w-5 h-5 text-[#f95721]" />
-                <h2 className="text-sm font-bold text-white">LeadFlow Activity Audit Trail</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={loadActivityLogs}
-                  disabled={isLoadingLogs}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a1a22] transition-colors"
-                  title="Refresh activity logs"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoadingLogs ? 'animate-spin' : ''}`} />
-                </button>
-                <button
-                  onClick={() => setIsActivityDrawerOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a1a22] transition-colors"
-                  title="Close drawer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
 
-            <div className="py-2.5 text-[11px] text-slate-400">
-              Chronological audit log of automated discovery, Firecrawl searches, Gemini scoring, Hunter.io inquiries, follow-up scheduling, and Gmail SMTP email dispatches.
-            </div>
 
-            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 py-2">
-              {activityLogs.length === 0 ? (
-                <div className="text-center text-xs text-slate-500 py-10">
-                  No activity events recorded yet.
-                </div>
-              ) : (
-                activityLogs.map((log) => {
-                  const isSuccess = log.level === 'SUCCESS';
-                  const isWarning = log.level === 'WARNING';
-                  const dateObj = new Date(log.created_at);
-                  const timeFormatted = dateObj.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                  });
-
-                  return (
-                    <div
-                      key={log.id}
-                      className="p-3 rounded-xl bg-[#14141a] border border-[#20202a] text-xs space-y-1 hover:border-[#2d2d3c] transition-colors"
-                    >
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span
-                          className={`font-bold px-1.5 py-0.5 rounded ${isSuccess
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-                            : isWarning
-                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
-                              : 'bg-blue-500/15 text-blue-400 border border-blue-500/25'
-                            }`}
-                        >
-                          {log.action}
-                        </span>
-                        <span className="font-mono text-slate-500">{timeFormatted}</span>
-                      </div>
-                      <div className="text-slate-300 text-[11px] leading-relaxed">{log.details}</div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="pt-3 border-t border-[#1f1f28] flex items-center justify-between text-[11px] text-slate-400">
-              <span>Total recorded: {activityLogs.length} events</span>
-              <button
-                onClick={() => setIsActivityDrawerOpen(false)}
-                className="px-3 py-1.5 rounded-lg bg-[#181820] text-slate-300 hover:text-white"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Complete Lead Profile Detail Modal */}
+      {selectedProfileLead && (
+        <LeadDetailModal
+          leadId={selectedProfileLead.id}
+          onClose={() => setSelectedProfileLead(null)}
+          onRefreshParent={loadActivityLogs}
+        />
       )}
     </div>
   );

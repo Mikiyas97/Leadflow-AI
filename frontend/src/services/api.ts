@@ -56,6 +56,8 @@ export const api = {
       pipeline_leads?: any[];
       qualified_count?: number;
       total_candidates?: number;
+      show_form?: boolean;
+      suggested_form_criteria?: LeadSearchRequest | null;
     }>('/chat', {
       method: 'POST',
       body: JSON.stringify({ messages, criteria }),

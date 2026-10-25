@@ -145,9 +145,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-2xl font-black text-emerald-400">{loading ? '...' : qualifiedLeads}</span>
             <span className="text-[10px] text-emerald-500/80 font-bold">({qualRate}% fit rate)</span>
           </div>
-          <div className="mt-2 text-[10px] text-slate-500">
-            Scored ≥ 65/100 by Gemini
-          </div>
         </div>
 
         {/* Outreach Drafts Prepared */}

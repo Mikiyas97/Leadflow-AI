@@ -114,13 +114,16 @@ class DiscoveryService:
 
         # 1. Parse target quantity
         qty = 5  # default count
-        qty_match = re.search(r"\b(?:find|get|discover|source|top)\s+(\d{1,2})\b", lower)
-        if qty_match:
-            qty = min(int(qty_match.group(1)), 15)
+        if re.search(r"\b(?:best\s+one|top\s+1|best\s+1|only\s+1|only\s+one|just\s+one|single\s+company|one\s+company|a\s+company|1\s+company|1\s+lead)\b", lower):
+            qty = 1
         else:
-            num_match = re.search(r"\b(\d{1,2})\s+(?:hotels|companies|businesses|startups|leads|firms)\b", lower)
-            if num_match:
-                qty = min(int(num_match.group(1)), 15)
+            qty_match = re.search(r"\b(?:find|get|discover|source|top)\s+(\d{1,2})\b", lower)
+            if qty_match:
+                qty = min(int(qty_match.group(1)), 15)
+            else:
+                num_match = re.search(r"\b(\d{1,2})\s+(?:hotels|companies|businesses|startups|leads|firms)\b", lower)
+                if num_match:
+                    qty = min(int(num_match.group(1)), 15)
 
         # 2. Parse company name (optional)
         company_name = None
@@ -179,20 +182,38 @@ class DiscoveryService:
         if ind_match:
             industry = ind_match.group(1).strip()
         else:
-            if "hotel" in lower or "hospitality" in lower or "resort" in lower:
-                industry = "Hospitality / Hotels"
-            elif "fintech" in lower or "banking" in lower or "payment" in lower:
-                industry = "FinTech"
-            elif "health" in lower or "medical" in lower or "clinic" in lower:
-                industry = "Healthcare"
-            elif "e-commerce" in lower or "ecommerce" in lower or "retail" in lower:
-                industry = "E-Commerce"
-            elif "logistics" in lower or "supply chain" in lower:
-                industry = "Logistics"
-            elif "saas" in lower or "software" in lower:
-                industry = "B2B SaaS"
-            elif "agency" in lower or "consulting" in lower:
-                industry = "Professional Services"
+            # Check for explicitly stated service provider or company activity (e.g. 'company that give web development service')
+            give_service_match = re.search(r"\b(?:give|gives|giving|provide|provides|providing|offer|offers|offering|specializing\s+in)\s+([A-Za-z\s&]+?)\s+(?:service|services|solutions)\b", lower)
+            if give_service_match:
+                matched_svc = give_service_match.group(1).strip().lower()
+                if "web" in matched_svc or "website" in matched_svc:
+                    industry = "Web Development"
+                elif "software" in matched_svc or "app" in matched_svc:
+                    industry = "Software Development"
+                elif "marketing" in matched_svc or "seo" in matched_svc:
+                    industry = "Digital Marketing"
+                else:
+                    industry = matched_svc.title()
+
+            if not industry:
+                if "web development" in lower or "website development" in lower or "web design" in lower or "web dev" in lower:
+                    industry = "Web Development"
+                elif "software development" in lower or "software engineering" in lower or "dev shop" in lower:
+                    industry = "Software Development"
+                elif "hotel" in lower or "hospitality" in lower or "resort" in lower:
+                    industry = "Hospitality / Hotels"
+                elif "fintech" in lower or "banking" in lower or "payment" in lower:
+                    industry = "FinTech"
+                elif "health" in lower or "medical" in lower or "clinic" in lower:
+                    industry = "Healthcare"
+                elif "e-commerce" in lower or "ecommerce" in lower or "retail" in lower:
+                    industry = "E-Commerce"
+                elif "logistics" in lower or "supply chain" in lower:
+                    industry = "Logistics"
+                elif "saas" in lower or "software" in lower:
+                    industry = "B2B SaaS"
+                elif "agency" in lower or "consulting" in lower:
+                    industry = "Professional Services"
 
         # 5. Parse keywords (optional)
         keywords = None
@@ -223,14 +244,23 @@ class DiscoveryService:
         pitch_match = re.search(r'\bpitch\s+["\']([^"\']+)["\']', user_text, re.IGNORECASE)
         if pitch_match:
             service_offered = pitch_match.group(1).strip()
-        elif "website development" in lower or "website-development" in lower or "web design" in lower or "web development" in lower:
-            service_offered = "Website Design & Development"
         elif "ai automation" in lower or "automation" in lower:
             service_offered = "AI Workflow Automation"
+        elif "website development" in lower or "website-development" in lower or "web design" in lower or "web development" in lower:
+            # If target industry itself is Web Development, pitch AI / automation solutions
+            if industry != "Web Development":
+                service_offered = "Website Design & Development"
+            else:
+                service_offered = "AI Workflow Automation & Client Operations"
         elif "sales ops" in lower or "sales operations" in lower or "lead generation" in lower:
             service_offered = "Sales Operations & Prospecting"
         elif "seo" in lower or "marketing" in lower:
             service_offered = "Digital Marketing & SEO"
+        else:
+            if industry == "Web Development":
+                service_offered = "AI Workflow Automation & Operations Solutions"
+            else:
+                service_offered = "General B2B Services"
 
         # 9. Check if user requires businesses without official websites
         require_no_website = any(p in lower for p in [
@@ -699,28 +729,53 @@ class DiscoveryService:
                 ]
                 return [d for d in ethiopian_delivery if d["website"] not in excluded]
 
-            elif "saas" in industry_lower or "software" in industry_lower or "tech" in industry_lower:
+            elif "web" in industry_lower or "saas" in industry_lower or "software" in industry_lower or "tech" in industry_lower:
                 ethiopian_saas = [
+                    {
+                        "company_name": "Addis Software",
+                        "website": "addissoftware.com",
+                        "industry": "Web Development & Software Engineering",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "20-50",
+                        "contact_name": "Henok Tsegaye",
+                        "source_url": "https://addissoftware.com/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "Prominent custom web development, mobile app development, and software engineering firm in Addis Ababa.",
+                        "description": "Addis Software is an established web and software development company based in Addis Ababa, Ethiopia, delivering full-stack web applications, cloud systems, and modern digital platforms."
+                    },
                     {
                         "company_name": "Zalatechs",
                         "website": "zalatechs.com",
-                        "industry": "B2B SaaS & Enterprise Software",
+                        "industry": "Web Development & Enterprise Software",
                         "location": "Addis Ababa, Ethiopia",
                         "company_size": "20-50",
+                        "contact_name": "Yared Abera",
                         "source_url": "https://zalatechs.com/",
                         "website_status": "HAS_OFFICIAL_WEBSITE",
-                        "website_evidence": "Active Ethiopian technology firm providing ERP and enterprise software.",
-                        "description": "Addis Ababa-based enterprise software, ERP development, and web solutions provider."
+                        "website_evidence": "Active Ethiopian technology firm providing custom web development, ERP, and enterprise software.",
+                        "description": "Addis Ababa-based web development, enterprise software, and cloud applications provider."
+                    },
+                    {
+                        "company_name": "Gebeya",
+                        "website": "gebeya.com",
+                        "industry": "Software Engineering & Web Development",
+                        "location": "Addis Ababa, Ethiopia",
+                        "company_size": "50-100",
+                        "contact_name": "Amadou Daffe",
+                        "source_url": "https://gebeya.com/",
+                        "website_status": "HAS_OFFICIAL_WEBSITE",
+                        "website_evidence": "Pan-African software engineering and web application consultancy based in Addis Ababa.",
+                        "description": "Leading tech company specializing in web application engineering, software architecture, and developer teams."
                     },
                     {
                         "company_name": "Orbit Health",
                         "website": "orbithealth.co",
-                        "industry": "Healthcare SaaS",
+                        "industry": "Healthcare SaaS & Web Solutions",
                         "location": "Addis Ababa, Ethiopia",
                         "company_size": "10-50",
                         "source_url": "https://orbithealth.co/",
                         "website_status": "HAS_OFFICIAL_WEBSITE",
-                        "website_evidence": "Digital healthcare SaaS platform based in Addis Ababa, Ethiopia.",
+                        "website_evidence": "Digital healthcare SaaS and web platform based in Addis Ababa, Ethiopia.",
                         "description": "SaaS clinical and hospital management software built in Ethiopia."
                     }
                 ]

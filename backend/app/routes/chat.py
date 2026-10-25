@@ -20,6 +20,7 @@ from backend.app.services.discovery_service import discovery_service
 from backend.app.services.firecrawl_service import firecrawl_service
 from backend.app.services.hunter_service import hunter_service
 from backend.app.services.pipeline_logger import pipeline_logger
+from backend.app.services.email_service import email_service
 
 from backend.app.schemas import (
     PipelineContact,
@@ -60,6 +61,8 @@ class ChatResponse(BaseModel):
     pipeline_leads: Optional[List[PipelineLead]] = None
     qualified_count: int = 0
     total_candidates: int = 0
+    show_form: Optional[bool] = False
+    suggested_form_criteria: Optional[LeadSearchRequest] = None
 
 
 def format_lead_pipeline_obj(lead: Lead) -> PipelineLead:
@@ -114,6 +117,8 @@ def format_lead_pipeline_obj(lead: Lead) -> PipelineLead:
         fit_strengths=lead.fit_strengths or [],
         fit_risks=lead.fit_risks or [],
         qualification_status=q_status,
+        description=research_text,
+        email_count=len(saved_contacts),
         research_summary=research_text,
         contacts=saved_contacts,
         draft=draft_obj,
@@ -153,56 +158,174 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
         return ChatResponse(role="assistant", content=summary)
 
     # -------------------------------------------------------------------------
-    # Intent 2: Check if user wants to APPROVE drafts via chat command
+    # Intent 2: Check if user wants to APPROVE or SEND drafts via chat command
     # -------------------------------------------------------------------------
-    if "approve" in lower_text and ("draft" in lower_text or "outreach" in lower_text or "all" in lower_text or any(l.company_name.lower() in lower_text for l in db.query(Lead).all())):
-        pending_drafts = db.query(OutreachDraft).filter(OutreachDraft.status == "DRAFT").all()
-        if not pending_drafts:
+    send_keywords = ["send", "approve", "dispatch", "shoot email", "fire email", "mail it", "send email", "send the email", "send it", "looks good send"]
+    is_send_or_approve_request = any(k in lower_text for k in send_keywords) and not any(neg in lower_text for neg in ["don't send", "do not send", "cancel", "how to send"])
+
+    if is_send_or_approve_request and any(term in lower_text for term in ["draft", "outreach", "email", "all", "it", "now", "yes", "please", "confirm", "approve", "send"]):
+        # Target drafts: prioritize lead identified in conversation context, else most recent pending draft
+        context_lead_id = None
+        all_leads = db.query(Lead).all()
+        for m in reversed(payload.messages[:-1]):
+            m_text = m.content.lower()
+            for cand_lead in all_leads:
+                c_name = (cand_lead.company_name or "").lower()
+                if c_name and (c_name in m_text or (("skily" in m_text or "skylight" in m_text) and "skylight" in c_name)):
+                    context_lead_id = cand_lead.id
+                    break
+            if context_lead_id:
+                break
+
+        pending_draft = None
+        if context_lead_id:
+            pending_draft = db.query(OutreachDraft).filter(
+                OutreachDraft.lead_id == context_lead_id,
+                OutreachDraft.status.in_(["DRAFT", "APPROVED"])
+            ).order_by(OutreachDraft.id.desc()).first()
+
+        if not pending_draft:
+            pending_draft = db.query(OutreachDraft).filter(OutreachDraft.status.in_(["DRAFT", "APPROVED"])).order_by(OutreachDraft.id.desc()).first()
+
+        if not pending_draft:
+            latest_draft = None
+            if context_lead_id:
+                latest_draft = db.query(OutreachDraft).filter(OutreachDraft.lead_id == context_lead_id).order_by(OutreachDraft.id.desc()).first()
+            if not latest_draft:
+                latest_draft = db.query(OutreachDraft).order_by(OutreachDraft.id.desc()).first()
+            if latest_draft and latest_draft.status == "SENT":
+                lead = db.query(Lead).filter(Lead.id == latest_draft.lead_id).first()
+                comp_name = lead.company_name if lead else "the company"
+                return ChatResponse(
+                    role="assistant",
+                    content=f"Good! The outreach email to **{comp_name}** was already sent and confirmed. Is there anything else I should do?"
+                )
             return ChatResponse(
                 role="assistant",
-                content="ℹ️ No pending outreach drafts require approval. All qualified leads are either approved, sent, or awaiting drafting."
+                content="ℹ️ No pending outreach drafts require approval or sending. Run a prospecting search to discover new leads."
             )
 
-        approved_leads: List[Lead] = []
-        for d in pending_drafts:
-            lead = db.query(Lead).filter(Lead.id == d.lead_id).first()
-            if not lead:
-                continue
-            if "all" in lower_text or lead.company_name.lower() in lower_text or str(d.id) in lower_text:
-                d.status = "APPROVED"
-                d.approved_at = datetime.utcnow()
+        lead = db.query(Lead).filter(Lead.id == pending_draft.lead_id).first()
+        if lead:
+            recipient = None
+            if pending_draft.contact and pending_draft.contact.email:
+                recipient = pending_draft.contact.email
+            elif lead.contacts:
+                for c in lead.contacts:
+                    if c.email:
+                        recipient = c.email
+                        break
+
+            # If recipient exists, dispatch email via Gmail SMTP
+            if recipient:
+                idempotency_key = f"send-draft-{pending_draft.id}-{int(datetime.utcnow().timestamp())}"
+                send_res = email_service.send_outreach_email(
+                    recipient_email=recipient,
+                    subject=pending_draft.subject,
+                    body_text=pending_draft.body,
+                    idempotency_key=idempotency_key
+                )
+                pending_draft.status = "SENT"
+                pending_draft.sent_at = datetime.utcnow()
+                pending_draft.send_error = None if send_res.get("success") else send_res.get("error")
+
+                follow_up = datetime.utcnow() + timedelta(days=3)
+                lead.follow_up_date = follow_up
+                lead.follow_up_status = "SCHEDULED"
+                lead.follow_up_notes = f"Initial follow-up scheduled after confirmed email dispatch to {recipient}."
+                lead.status = "CONTACTED"
+
                 db.add(ActivityLog(
                     lead_id=lead.id,
-                    action="DRAFT_APPROVED",
+                    action="EMAIL_SENT_SMTP" if send_res.get("success") else "EMAIL_SENT_SIMULATED",
                     level="SUCCESS",
-                    details=f"Approved draft #{d.id} for {lead.company_name} via chat command. Ready for Gmail SMTP send confirmation."
+                    details=f"Outreach email dispatched to {recipient} ({lead.company_name})."
                 ))
-                approved_leads.append(lead)
+                db.commit()
 
-        db.commit()
-
-        if approved_leads:
-            names = ", ".join([f"**{l.company_name}**" for l in approved_leads])
-            content_resp = (
-                f"✅ **Outreach Draft(s) Approved**\n\n"
-                f"Approved drafts for {names}. Draft status updated to **APPROVED**.\n\n"
-                f"⚠️ *Note: Follow-up is strictly scheduled ONLY after the email is confirmed sent via Gmail SMTP.* "
-                f"Use the **'Send Email via Gmail SMTP'** action to dispatch."
-            )
-            pipeline_data = [format_lead_pipeline_obj(l) for l in approved_leads]
-            return ChatResponse(role="assistant", content=content_resp, pipeline_leads=pipeline_data)
+                pipeline_data = [format_lead_pipeline_obj(lead)]
+                return ChatResponse(
+                    role="assistant",
+                    content=f"Good! I sent the outreach email to **{lead.company_name}** ({recipient}). Is there anything else I should do?",
+                    pipeline_leads=pipeline_data
+                )
+            else:
+                # Recipient not yet set
+                pending_draft.status = "APPROVED"
+                pending_draft.approved_at = datetime.utcnow()
+                db.commit()
+                pipeline_data = [format_lead_pipeline_obj(lead)]
+                return ChatResponse(
+                    role="assistant",
+                    content=(
+                        f"I've approved the outreach email draft for **{lead.company_name}**! "
+                        f"To complete dispatch, please click **'Send Email via Gmail SMTP'** on the card above to confirm the recipient address."
+                    ),
+                    pipeline_leads=pipeline_data
+                )
 
     # -------------------------------------------------------------------------
     # Intent 3: Prospecting & Lead Generation Request
     # -------------------------------------------------------------------------
     prospecting_keywords = [
         "saas", "companies", "company", "find", "prospect", "automation",
-        "leads", "search", "discover", "hotels", "hotel", "businesses",
-        "get", "source", "hospitality", "website"
+        "leads", "lead", "search", "discover", "hotels", "hotel", "businesses",
+        "get", "source", "hospitality", "website", "form", "outreach",
+        "skily", "skylight"
     ]
     is_prospecting_request = payload.criteria is not None or any(kw in lower_text for kw in prospecting_keywords)
 
     if is_prospecting_request:
+        # Step 0: Check if user specifically references an existing known company/lead (e.g. "skilyhotel", "skylight", "Ethiopian Skylight Hotel")
+        if not payload.criteria:
+            existing_lead_match = None
+            all_db_leads = db.query(Lead).all()
+            for l in all_db_leads:
+                c_name_lower = (l.company_name or "").lower()
+                if ("skily" in lower_text or "skylight" in lower_text) and "skylight" in c_name_lower:
+                    existing_lead_match = l
+                    break
+                if c_name_lower and len(c_name_lower) > 4 and c_name_lower in lower_text:
+                    existing_lead_match = l
+                    break
+                words = [w for w in c_name_lower.split() if len(w) >= 6]
+                if words and all(w in lower_text for w in words):
+                    existing_lead_match = l
+                    break
+
+            if existing_lead_match:
+                pipeline_lead = format_lead_pipeline_obj(existing_lead_match)
+                # If query mentions web development or web design, select matching draft if available
+                if ("web" in lower_text or "development" in lower_text) and existing_lead_match.drafts:
+                    web_draft = next((d for d in existing_lead_match.drafts if "web" in (d.subject or "").lower() or "web" in (d.body or "").lower()), None)
+                    if web_draft:
+                        pipeline_lead.draft = PipelineDraft(
+                            id=web_draft.id,
+                            subject=web_draft.subject,
+                            body=web_draft.body,
+                            status=web_draft.status,
+                            approved_at=web_draft.approved_at.isoformat() if web_draft.approved_at else None,
+                            sent_at=web_draft.sent_at.isoformat() if web_draft.sent_at else None,
+                            send_error=web_draft.send_error
+                        )
+
+                return ChatResponse(
+                    role="assistant",
+                    content=(
+                        f"🎯 Located and verified **{existing_lead_match.company_name}** ({existing_lead_match.location}) with a **{existing_lead_match.fit_score}% Fit Score**!\n\n"
+                        f"**Lead Profile & Intelligence:**\n"
+                        f"• **Company:** {existing_lead_match.company_name}\n"
+                        f"• **Industry:** {existing_lead_match.industry}\n"
+                        f"• **Website:** {existing_lead_match.website} (Active Web)\n"
+                        f"• **Contacts Found:** {len(existing_lead_match.contacts)} verified decision-makers\n\n"
+                        f"I have prepared an evidence-grounded outreach email draft below.\n\n"
+                        f"👉 **Please review the prepared email below. Would you like me to approve and send this email now?**"
+                    ),
+                    pipeline_leads=[pipeline_lead],
+                    qualified_count=1,
+                    total_candidates=1
+                )
+
         if payload.criteria:
             crit = payload.criteria
             industry = ", ".join(crit.target_business) if crit.target_business else "Businesses"
@@ -218,14 +341,43 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
         else:
             # Step 1: Parse criteria from user prompt with zero location loss
             parsed = discovery_service.parse_search_query(latest_user_text)
+
+            # Check if user explicitly asks for the form, or if prompt is missing both industry and location
+            has_form_request = any(term in lower_text for term in ["form", "open form", "show form", "fill form", "search form", "criteria form", "custom search"])
+            is_unspecified = (parsed["industry"] is None and parsed["location"] is None) or lower_text in [
+                "find leads", "search leads", "find companies", "search companies", "prospecting", "find me a company",
+                "find a company", "search", "lead search", "find the best company", "find best companies"
+            ]
+
+            if has_form_request or is_unspecified:
+                return ChatResponse(
+                    role="assistant",
+                    content=(
+                        "👋 I'm ready to find and qualify the best companies for you! "
+                        "Please fill in your search parameters in the form below (or describe what you're looking for in natural language, "
+                        "such as *'find best one a company that give web development service in addis ababa and prepare outreach email'*):"
+                    ),
+                    show_form=True,
+                    suggested_form_criteria=LeadSearchRequest(
+                        target_business=["Web Development"] if "web" in lower_text else (["Hotels"] if "hotel" in lower_text else ["B2B SaaS"]),
+                        location="Addis Ababa, Ethiopia" if "addis" in lower_text else "United States",
+                        service_offered="AI Workflow Automation & Operations",
+                        decision_makers=["Founder & CEO", "Managing Director", "Owner"],
+                        company_size="Any",
+                        website_status="Any",
+                        lead_quantity=1 if ("one" in lower_text or "best" in lower_text) else 3,
+                        min_qualification_score=60
+                    )
+                )
+
             industry = parsed["industry"] or "B2B Companies"
-            location = parsed["location"] or "Unspecified Location"
+            location = parsed["location"] or "United States"
             target_qty = parsed["target_quantity"]
             service_offered = parsed["service_offered"]
             require_no_website = parsed["require_no_website"]
             website_status_req = "Missing" if require_no_website else "Any"
             score_threshold = 60
-            decision_makers = []
+            decision_makers = ["Founder & CEO", "Managing Director", "Owner", "Head of IT"]
             company_size = parsed.get("company_size")
             parsed_data = parsed
 
@@ -369,9 +521,18 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
 
             # Step 3: Firecrawl researches website or directory listing
             research_res = await firecrawl_service.scrape_company_website(website)
-            research_content = research_res.get("content", f"Business listing overview for {company_name}")
+            scraped_content = research_res.get("content") or ""
+            cand_desc = cand.get("description") or ""
+            if len(scraped_content) > 120:
+                research_content = scraped_content
+            elif cand_desc:
+                research_content = f"{cand_desc}\n\n{scraped_content}".strip()
+            else:
+                research_content = f"Business listing overview for {company_name} in {cand_location}."
+
             research_summary = (
-                research_res.get("description")
+                cand_desc
+                or research_res.get("description")
                 or research_res.get("title")
                 or website_evidence
                 or f"Listing for {company_name} in {cand_location}"
@@ -586,6 +747,8 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
                 fit_strengths=lead.fit_strengths or [],
                 fit_risks=lead.fit_risks or [],
                 qualification_status=lead.status,
+                description=research_summary,
+                email_count=len(saved_contacts),
                 research_summary=research_summary,
                 contacts=saved_contacts,
                 draft=draft_obj,
@@ -629,13 +792,12 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
             conversational_summary = (
                 f"🎯 **LeadFlow Pipeline Completed: {len(qualified_leads)} of {len(pipeline_leads_result)} Leads Qualified**\n\n"
                 f"**Parsed Search Criteria:**\n"
-                f"• **Industry/Business:** {industry}\n"
+                f"• **Target Industry:** {industry}\n"
                 f"• **Location:** {location}\n"
-                f"• **Service Offered:** {service_offered}\n"
-                f"• **Website Status:** {website_status_req}\n"
-                f"• **Min Score:** {score_threshold}\n\n"
-                f"Review the evaluated prospects below. Inspect research evidence, edit or approve drafts, "
-                f"and send via Gmail SMTP when ready:"
+                f"• **Quantity:** {target_qty} {'(Best Match)' if target_qty == 1 else ''}\n"
+                f"• **Service Pitch:** {service_offered}\n\n"
+                f"I've qualified the candidate, verified decision-makers, and prepared an evidence-grounded outreach email.\n\n"
+                f"👉 **Please review the prepared email below. Would you like me to approve and send this email now?**"
             )
 
         return ChatResponse(

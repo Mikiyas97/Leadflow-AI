@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Users,
   MailCheck,
-  History,
   Sparkles,
   MessageSquareCode,
   Compass,
@@ -80,15 +79,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Outreach Review',
       desc: 'Edit, Approve & SMTP Send',
       icon: MailCheck,
-    },
-  ];
-
-  const secondaryNavItems = [
-    {
-      id: 'activity' as ActiveTab,
-      label: 'Activity Audit Log',
-      desc: 'Runs, Deduplication & Errors',
-      icon: History,
     },
   ];
 
@@ -177,15 +167,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onCloseMobile();
                       }}
                       className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all group ${isActive
-                          ? 'bg-[#181824] text-white border border-[#2c2c3e] shadow-sm'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-[#121218]'
+                        ? 'bg-[#181824] text-white border border-[#2c2c3e] shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-[#121218]'
                         }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
                           className={`p-1.5 rounded-lg transition-colors ${isActive
-                              ? 'bg-[#f95721] text-white shadow-sm'
-                              : 'bg-[#14141c] text-slate-400 group-hover:text-[#f95721]'
+                            ? 'bg-[#f95721] text-white shadow-sm'
+                            : 'bg-[#14141c] text-slate-400 group-hover:text-[#f95721]'
                             }`}
                         >
                           <Icon className="w-4 h-4" />
@@ -261,11 +251,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     onTabChange('agent');
                                     onCloseMobile();
                                   }}
-                                  className={`group/sess w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-all ${
-                                    isCurrent
+                                  className={`group/sess w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-all ${isCurrent
                                       ? 'bg-[#1b1b28] text-white font-medium border border-[#2f2f44] shadow-sm'
                                       : 'text-slate-400 hover:text-slate-200 hover:bg-[#13131a]'
-                                  }`}
+                                    }`}
                                   title={sess.title}
                                 >
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -294,58 +283,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                     )}
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Section 2: Operations & Audit */}
-            <div className="space-y-1 pt-2 border-t border-[#1a1a24]">
-              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Control & Compliance
-              </div>
-
-              {secondaryNavItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onTabChange(item.id);
-                      onCloseMobile();
-                    }}
-                    className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all group ${isActive
-                        ? 'bg-[#181824] text-white border border-[#2c2c3e] shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-[#121218]'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-1.5 rounded-lg transition-colors ${isActive
-                            ? 'bg-[#f95721] text-white shadow-sm'
-                            : 'bg-[#14141c] text-slate-400 group-hover:text-[#f95721]'
-                          }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div
-                          className={`text-xs font-semibold ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'
-                            }`}
-                        >
-                          {item.label}
-                        </div>
-                        <div className="text-[10px] text-slate-400">
-                          {item.desc}
-                        </div>
-                      </div>
-                    </div>
-
-                    <ChevronRight
-                      className={`w-3.5 h-3.5 text-slate-600 transition-transform ${isActive ? 'text-[#f95721] translate-x-0.5' : 'opacity-0 group-hover:opacity-100'
-                        }`}
-                    />
-                  </button>
                 );
               })}
             </div>
