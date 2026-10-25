@@ -60,15 +60,12 @@ export const ActivityFeedView: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 animate-fade-in">
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <span>Automation Runs & Audit Log</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#181822] text-[#f95721] border border-[#262634]">
-              FR-08 Audit Trail
-            </span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             Immutable log of automation runs, duplicate lead prevention, AI scoring events, and SMTP delivery results.
@@ -84,11 +81,10 @@ export const ActivityFeedView: React.FC = () => {
             <button
               key={lvl}
               onClick={() => setFilterLevel(lvl)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                filterLevel === lvl
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${filterLevel === lvl
                   ? 'bg-[#f95721] text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               {lvl}
             </button>

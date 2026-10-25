@@ -159,8 +159,8 @@ export const OutreachReviewView: React.FC<OutreachReviewViewProps> = ({ onRefres
               key={tab.id}
               onClick={() => setActiveFilter(tab.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeFilter === tab.id
-                  ? 'bg-[#f95721] text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#f95721] text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
                 }`}
             >
               {tab.label}
@@ -202,10 +202,10 @@ export const OutreachReviewView: React.FC<OutreachReviewViewProps> = ({ onRefres
               <div
                 key={draft.id}
                 className={`p-5 rounded-2xl border transition-all ${isSent
-                    ? 'bg-[#101318] border-indigo-500/30'
-                    : isApproved
-                      ? 'bg-[#101614] border-emerald-500/30'
-                      : 'bg-[#121217] border-[#22222c] hover:border-[#2e2e3c]'
+                  ? 'bg-[#101318] border-indigo-500/30'
+                  : isApproved
+                    ? 'bg-[#101614] border-emerald-500/30'
+                    : 'bg-[#121217] border-[#22222c] hover:border-[#2e2e3c]'
                   }`}
               >
                 {/* Header Row */}
@@ -213,10 +213,10 @@ export const OutreachReviewView: React.FC<OutreachReviewViewProps> = ({ onRefres
                   <div className="flex items-center gap-3">
                     <span
                       className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${isSent
-                          ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25'
-                          : isApproved
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                        ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25'
+                        : isApproved
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                          : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
                         }`}
                     >
                       {draft.status}
@@ -411,15 +411,6 @@ export const OutreachReviewView: React.FC<OutreachReviewViewProps> = ({ onRefres
                 <div className="mt-1 p-3 rounded-xl bg-[#0c0c10] border border-[#20202a] text-xs text-slate-300 max-h-36 overflow-y-auto whitespace-pre-wrap leading-relaxed font-sans">
                   {sendDraft.body}
                 </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#14141c] border border-[#22222e] text-[11px] text-slate-400 space-y-1">
-                <div className="font-semibold text-slate-300 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Human-in-the-Loop Safeguards:</span>
-                </div>
-                <p>• Verified idempotency prevents duplicate dispatch.</p>
-                <p>• 3-day follow-up touchpoint is scheduled strictly upon verified delivery acceptance.</p>
               </div>
 
               {sendError && (

@@ -8,9 +8,20 @@ import { OutreachReviewView } from './components/OutreachReviewView';
 import { ActivityFeedView } from './components/ActivityFeedView';
 import { LeadDetailModal } from './components/LeadDetailModal';
 import { DiscoveryModal } from './components/DiscoveryModal';
-import type { DashboardStats, TargetProfile } from './types';
+import type { DashboardStats, TargetProfile, ChatSession, ChatMessage } from './types';
 import { api } from './services/api';
 import { KeyRound, Send, CheckCircle2, AlertCircle, Menu, Flame } from 'lucide-react';
+
+const createNewSession = (): ChatSession => {
+  const id = `session-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  return {
+    id,
+    title: 'New Chat',
+    messages: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+};
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
@@ -24,6 +35,127 @@ export const App: React.FC = () => {
     }
     return 'agent';
   });
+
+  // Chat sessions state
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
+    try {
+      const saved = localStorage.getItem('leadflow_chat_sessions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return [createNewSession()];
+  });
+
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('leadflow_active_session_id');
+      if (saved) return saved;
+    } catch {
+      // ignore
+    }
+    return '';
+  });
+
+  // Ensure activeSessionId points to an existing session
+  useEffect(() => {
+    if (chatSessions.length > 0) {
+      const exists = chatSessions.some((s) => s.id === activeSessionId);
+      if (!exists) {
+        setActiveSessionId(chatSessions[0].id);
+      }
+    }
+  }, [chatSessions, activeSessionId]);
+
+  // Persist sessions to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('leadflow_chat_sessions', JSON.stringify(chatSessions));
+    } catch {
+      // ignore
+    }
+  }, [chatSessions]);
+
+  // Persist activeSessionId to localStorage
+  useEffect(() => {
+    try {
+      if (activeSessionId) {
+        localStorage.setItem('leadflow_active_session_id', activeSessionId);
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeSessionId]);
+
+  const handleNewChat = () => {
+    const active = chatSessions.find((s) => s.id === activeSessionId);
+    if (active && active.messages.length === 0) {
+      setActiveTab('agent');
+      return;
+    }
+
+    const fresh = createNewSession();
+    setChatSessions((prev) => [fresh, ...prev]);
+    setActiveSessionId(fresh.id);
+    setActiveTab('agent');
+  };
+
+  const handleSelectSession = (sessionId: string) => {
+    setActiveSessionId(sessionId);
+    setActiveTab('agent');
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    setChatSessions((prev) => {
+      const filtered = prev.filter((s) => s.id !== sessionId);
+      if (filtered.length === 0) {
+        const fresh = createNewSession();
+        setActiveSessionId(fresh.id);
+        return [fresh];
+      }
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(filtered[0].id);
+      }
+      return filtered;
+    });
+  };
+
+  const handleUpdateSessionMessages = (
+    sessionId: string,
+    newMessages: ChatMessage[],
+    customTitle?: string
+  ) => {
+    setChatSessions((prev) =>
+      prev.map((session) => {
+        if (session.id !== sessionId) return session;
+
+        let title = session.title;
+        if (customTitle) {
+          title = customTitle;
+        } else if ((session.title === 'New Chat' || !session.title) && newMessages.length > 0) {
+          const firstUserMsg = newMessages.find((m) => m.role === 'user');
+          if (firstUserMsg && firstUserMsg.content) {
+            const clean = firstUserMsg.content.trim().replace(/^["']|["']$/g, '');
+            title = clean.length > 36 ? `${clean.substring(0, 36)}...` : clean;
+          }
+        }
+
+        return {
+          ...session,
+          title,
+          messages: newMessages,
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+  };
+
+  const activeSession = chatSessions.find((s) => s.id === activeSessionId) || chatSessions[0] || null;
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loadingStats, setLoadingStats] = useState<boolean>(true);
   const [isBackendHealthy, setIsBackendHealthy] = useState<boolean>(true);
@@ -119,13 +251,18 @@ export const App: React.FC = () => {
         overdueCount={stats?.overdue_followups_count || 0}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        chatSessions={chatSessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 md:ml-64 flex flex-col min-w-0 min-h-screen bg-[#09090b]">
+      <div className={`flex-1 md:ml-64 flex flex-col min-w-0 bg-[#09090b] ${activeTab === 'agent' ? 'h-screen max-h-screen overflow-hidden' : 'min-h-screen'}`}>
         
         {/* Mobile Header Bar */}
-        <header className="md:hidden flex items-center justify-between p-3.5 bg-[#0a0a0d] border-b border-[#1c1c24] sticky top-0 z-30">
+        <header className="md:hidden flex items-center justify-between p-3.5 bg-[#0a0a0d] border-b border-[#1c1c24] sticky top-0 z-30 shrink-0">
           <button
             onClick={() => setIsMobileSidebarOpen(true)}
             className="p-2 rounded-xl bg-[#14141c] border border-[#22222e] text-slate-300 hover:text-white"
@@ -149,8 +286,14 @@ export const App: React.FC = () => {
         </header>
 
         {/* View Content */}
-        <main className="flex-1 flex flex-col">
-          {activeTab === 'agent' && <ChatbotUI />}
+        <main className={`flex-1 flex flex-col ${activeTab === 'agent' ? 'min-h-0 overflow-hidden' : ''}`}>
+          {activeTab === 'agent' && (
+            <ChatbotUI
+              session={activeSession || undefined}
+              onUpdateSessionMessages={handleUpdateSessionMessages}
+              onNewChat={handleNewChat}
+            />
+          )}
 
           {activeTab === 'dashboard' && (
             <DashboardView

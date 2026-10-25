@@ -61,6 +61,14 @@ export interface ChatMessage {
   total_candidates?: number;
 }
 
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TargetProfile {
   id: number;
   name: string;

@@ -1447,79 +1447,84 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
 
             {/* Right Column: In-page Company Inspector Panel (Matches Exact Screenshot Layout) */}
             {inspectedLead && (
-              <div className="w-full lg:w-[55%] xl:w-[58%] bg-[#121217] border border-[#22222e] rounded-2xl p-4 sm:p-5 shadow-2xl animate-fade-in space-y-3.5 sticky top-4">
+              <div className="w-full lg:w-[55%] xl:w-[58%] bg-[#121217] border border-[#22222e] rounded-2xl shadow-2xl animate-fade-in flex flex-col sticky top-4 max-h-[calc(100vh-2rem)] overflow-hidden">
 
-                {/* Panel Top Row: Logo, Name, Email Count, Close Button */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3.5">
-                    {/* Large Logo */}
-                    <div className="w-14 h-14 rounded-2xl bg-white p-2 flex items-center justify-center shrink-0 border border-slate-200 shadow-md overflow-hidden">
-                      {cleanDomain(inspectedLead.website) ? (
-                        <img
-                          src={`https://www.google.com/s2/favicons?domain=${cleanDomain(inspectedLead.website)}&sz=128`}
-                          alt={inspectedLead.company_name}
-                          className="w-10 h-10 object-contain"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            if (e.currentTarget.parentElement) {
-                              e.currentTarget.parentElement.innerHTML = `<span class="font-bold text-base text-slate-900">${inspectedLead.company_name.substring(0, 2).toUpperCase()}</span>`;
-                            }
-                          }}
-                        />
-                      ) : (
-                        <Building2 className="w-8 h-8 text-slate-800" />
-                      )}
-                    </div>
-
-                    <div>
-                      <h2 className="text-lg font-bold text-white flex items-center gap-2 flex-wrap">
-                        <span>{inspectedLead.company_name}</span>
-                        {inspectedLead.fit_score !== undefined && inspectedLead.fit_score !== null && (
-                          <span className={`text-[11px] px-2 py-0.5 rounded-md border font-semibold ${(inspectedLead.qualification_status === 'QUALIFIED' || inspectedLead.fit_score >= Number(minQualificationScore))
-                              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                              : 'bg-rose-500/10 border-rose-500/25 text-rose-300'
-                            }`}>
-                            {(inspectedLead.qualification_status === 'QUALIFIED' || inspectedLead.fit_score >= Number(minQualificationScore)) ? 'Qualified' : 'Disqualified'} {inspectedLead.fit_score}%
-                          </span>
+                {/* Panel Top Row: Logo, Name, Email Count, Close Button (Fixed at Top) */}
+                <div className="p-4 sm:p-5 pb-3 border-b border-[#1c1c28] shrink-0 bg-[#121217]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3.5">
+                      {/* Large Logo */}
+                      <div className="w-14 h-14 rounded-2xl bg-white p-2 flex items-center justify-center shrink-0 border border-slate-200 shadow-md overflow-hidden">
+                        {cleanDomain(inspectedLead.website) ? (
+                          <img
+                            src={`https://www.google.com/s2/favicons?domain=${cleanDomain(inspectedLead.website)}&sz=128`}
+                            alt={inspectedLead.company_name}
+                            className="w-10 h-10 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              if (e.currentTarget.parentElement) {
+                                e.currentTarget.parentElement.innerHTML = `<span class="font-bold text-base text-slate-900">${inspectedLead.company_name.substring(0, 2).toUpperCase()}</span>`;
+                              }
+                            }}
+                          />
+                        ) : (
+                          <Building2 className="w-8 h-8 text-slate-800" />
                         )}
-                      </h2>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        {(() => {
-                          const badge = getWebsiteStatusBadge(inspectedLead.website_status);
-                          if (!badge) return null;
-                          return (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-medium ${badge.className}`}>
-                              {badge.label}
+                      </div>
+
+                      <div>
+                        <h2 className="text-lg font-bold text-white flex items-center gap-2 flex-wrap">
+                          <span>{inspectedLead.company_name}</span>
+                          {inspectedLead.fit_score !== undefined && inspectedLead.fit_score !== null && (
+                            <span className={`text-[11px] px-2 py-0.5 rounded-md border font-semibold ${(inspectedLead.qualification_status === 'QUALIFIED' || inspectedLead.fit_score >= Number(minQualificationScore))
+                                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                : 'bg-rose-500/10 border-rose-500/25 text-rose-300'
+                              }`}>
+                              {(inspectedLead.qualification_status === 'QUALIFIED' || inspectedLead.fit_score >= Number(minQualificationScore)) ? 'Qualified' : 'Disqualified'} {inspectedLead.fit_score}%
                             </span>
-                          );
-                        })()}
-                        <div className="inline-block px-2.5 py-0.5 rounded-md bg-[#1c1c28] border border-[#2c2c3e] text-xs font-semibold text-slate-200 shadow-sm">
-                          {formatEmailCount(inspectedLead)} emails
+                          )}
+                        </h2>
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {(() => {
+                            const badge = getWebsiteStatusBadge(inspectedLead.website_status);
+                            if (!badge) return null;
+                            return (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-medium ${badge.className}`}>
+                                {badge.label}
+                              </span>
+                            );
+                          })()}
+                          <div className="inline-block px-2.5 py-0.5 rounded-md bg-[#1c1c28] border border-[#2c2c3e] text-xs font-semibold text-slate-200 shadow-sm">
+                            {formatEmailCount(inspectedLead)} emails
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Actions: View full lead detail modal & Close Inspector */}
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => onSelectLead?.(inspectedLead.id)}
-                      className="px-2.5 py-1 rounded-lg bg-[#181824] hover:bg-[#222232] border border-[#2a2a3e] text-slate-300 hover:text-white text-xs font-medium transition-colors"
-                      title="Open complete lead detail modal"
-                    >
-                      Lead Profile
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInspectedLead(null)}
-                      className="p-1.5 rounded-lg hover:bg-[#1f1f2e] text-slate-400 hover:text-white transition-colors"
-                      title="Close Inspector"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    {/* Actions: View full lead detail modal & Close Inspector */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onSelectLead?.(inspectedLead.id)}
+                        className="px-2.5 py-1 rounded-lg bg-[#181824] hover:bg-[#222232] border border-[#2a2a3e] text-slate-300 hover:text-white text-xs font-medium transition-colors"
+                        title="Open complete lead detail modal"
+                      >
+                        Lead Profile
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInspectedLead(null)}
+                        className="p-1.5 rounded-lg hover:bg-[#1f1f2e] text-slate-400 hover:text-white transition-colors"
+                        title="Close Inspector"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {/* Scrollable Panel Body */}
+                <div className="p-4 sm:p-5 pt-3.5 space-y-3.5 overflow-y-auto flex-1 overscroll-contain">
 
                 {/* Company Description */}
                 <p className="text-xs text-slate-300 leading-relaxed">
@@ -1712,9 +1717,10 @@ export const SearchLeadsView: React.FC<SearchLeadsViewProps> = ({
                   })()}
 
                 </div>
-
               </div>
-            )}
+
+            </div>
+          )}
 
           </div>
 

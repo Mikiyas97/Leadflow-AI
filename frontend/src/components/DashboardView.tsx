@@ -86,15 +86,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6 animate-fade-in">
-      
+
       {/* Top Header & Quick Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <span>Sales Operations Dashboard</span>
-            <span className="text-[11px] font-normal px-2 py-0.5 rounded-full bg-[#1e1e28] text-slate-400 border border-[#2a2a38]">
-              Autonomous Pipeline Monitor
-            </span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             Real-time prospect discovery, AI qualification metrics, email dispatch, and follow-up tracking.
@@ -110,20 +107,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
-
-          <button
-            onClick={onOpenDiscovery}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#f95721] hover:bg-[#ea4710] text-white text-xs font-semibold shadow-md shadow-[#f95721]/20 transition-all hover:scale-[1.01]"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Start Discovery Run</span>
-          </button>
         </div>
       </div>
 
       {/* FR-11: Performance Summaries KPI Grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-        
+
         {/* Total Leads Discovered */}
         <div className="bg-[#121217] border border-[#22222c] rounded-2xl p-4 hover:border-[#2e2e3c] transition-all">
           <div className="flex items-center justify-between">
@@ -217,125 +206,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       </div>
 
-      {/* FR-09: Overdue Follow-ups Alert Section */}
-      <div className={`p-5 rounded-2xl border transition-all ${
-        overdueCount > 0
-          ? 'bg-gradient-to-r from-amber-950/30 via-[#181412] to-[#121217] border-amber-500/30 shadow-lg shadow-amber-500/5'
-          : 'bg-[#121217] border-[#22222c]'
-      }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2.5">
-            <div className={`p-2 rounded-xl ${
-              overdueCount > 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-emerald-500/10 text-emerald-400'
-            }`}>
-              {overdueCount > 0 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-            </div>
-            <div>
-              <div className="text-sm font-bold text-white flex items-center gap-2">
-                <span>Overdue Follow-up Tracker</span>
-                {overdueCount > 0 ? (
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500 text-black">
-                    {overdueCount} Action Required
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    All Clear
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-400">
-                {overdueCount > 0
-                  ? 'Leads that received outreach and have passed their scheduled 3-day follow-up touchpoint date.'
-                  : 'All prospective leads are on schedule. No overdue outreach follow-ups at this time.'}
-              </p>
-            </div>
-          </div>
-
-          {overdueCount > 0 && (
-            <button
-              onClick={() => onNavigateTab('manage-leads')}
-              className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 self-start sm:self-center"
-            >
-              <span>View Overdue in Manage Leads</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Overdue Items List */}
-        {overdueLeads.length > 0 && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {overdueLeads.map((item) => (
-              <div
-                key={item.id}
-                className="p-3.5 rounded-xl bg-[#0e0e13] border border-amber-500/20 hover:border-amber-500/40 transition-all flex flex-col justify-between space-y-2.5"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <button
-                      onClick={() => onSelectLead(item.id)}
-                      className="text-xs font-bold text-white hover:text-amber-300 text-left transition-colors truncate"
-                    >
-                      {item.company_name}
-                    </button>
-                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
-                      {item.days_overdue}d overdue
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1">
-                    <span className="truncate">{item.website}</span>
-                    {item.location && (
-                      <span className="flex items-center gap-0.5 text-slate-500 shrink-0">
-                        <MapPin className="w-2.5 h-2.5" />
-                        <span className="truncate max-w-[90px]">{item.location}</span>
-                      </span>
-                    )}
-                  </div>
-
-                  {item.follow_up_notes && (
-                    <p className="text-[10px] text-slate-400 bg-[#14141c] p-1.5 rounded-lg border border-[#22222e] mt-2 line-clamp-2">
-                      {item.follow_up_notes}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-[#1e1e28]">
-                  <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-amber-400" />
-                    <span>Due: {new Date(item.follow_up_date).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-                  </span>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleMarkComplete(item.id)}
-                      disabled={isUpdatingFollowUp}
-                      className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-[10px] font-medium transition-colors"
-                      title="Mark follow-up completed"
-                    >
-                      Complete
-                    </button>
-                    <button
-                      onClick={() => {
-                        setRescheduleLead(item);
-                        setRescheduleNotes(item.follow_up_notes || '');
-                      }}
-                      className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-[10px] font-medium transition-colors"
-                    >
-                      Reschedule
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Grid: Recent Runs & Live Activity Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        
+
         {/* Recent Automation Runs */}
         <div className="bg-[#121217] border border-[#22222c] rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
@@ -364,15 +237,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className={`h-2.5 w-2.5 rounded-full ${
-                        run.status === 'COMPLETED'
-                          ? 'bg-emerald-400'
-                          : run.status === 'RUNNING'
+                      className={`h-2.5 w-2.5 rounded-full ${run.status === 'COMPLETED'
+                        ? 'bg-emerald-400'
+                        : run.status === 'RUNNING'
                           ? 'bg-[#f95721] animate-ping'
                           : run.status === 'FAILED'
-                          ? 'bg-red-400'
-                          : 'bg-amber-400'
-                      }`}
+                            ? 'bg-red-400'
+                            : 'bg-amber-400'
+                        }`}
                     />
                     <div>
                       <div className="text-xs font-bold text-white">
@@ -386,13 +258,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   <div className="text-right">
                     <span
-                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                        run.status === 'COMPLETED'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : run.status === 'RUNNING'
+                      className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md ${run.status === 'COMPLETED'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : run.status === 'RUNNING'
                           ? 'bg-[#f95721]/10 text-[#f95721] border border-[#f95721]/20'
                           : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                      }`}
+                        }`}
                     >
                       {run.status}
                     </span>
@@ -433,15 +304,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#0e0e13] border border-[#1e1e28] text-xs"
                 >
                   <span
-                    className={`mt-1 h-2 w-2 rounded-full shrink-0 ${
-                      act.level === 'SUCCESS'
-                        ? 'bg-emerald-400'
-                        : act.level === 'WARNING'
+                    className={`mt-1 h-2 w-2 rounded-full shrink-0 ${act.level === 'SUCCESS'
+                      ? 'bg-emerald-400'
+                      : act.level === 'WARNING'
                         ? 'bg-amber-400'
                         : act.level === 'ERROR'
-                        ? 'bg-red-400'
-                        : 'bg-blue-400'
-                    }`}
+                          ? 'bg-red-400'
+                          : 'bg-blue-400'
+                      }`}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
@@ -494,11 +364,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       key={d}
                       type="button"
                       onClick={() => setRescheduleDays(d)}
-                      className={`py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                        rescheduleDays === d
-                          ? 'bg-amber-500 text-black border-amber-400'
-                          : 'bg-[#181822] text-slate-300 border-[#2a2a38] hover:border-slate-500'
-                      }`}
+                      className={`py-1.5 rounded-lg text-xs font-semibold border transition-all ${rescheduleDays === d
+                        ? 'bg-amber-500 text-black border-amber-400'
+                        : 'bg-[#181822] text-slate-300 border-[#2a2a38] hover:border-slate-500'
+                        }`}
                     >
                       +{d} Day{d > 1 ? 's' : ''}
                     </button>

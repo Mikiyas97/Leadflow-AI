@@ -22,22 +22,20 @@ import {
   MapPin,
   Zap,
   History,
-  CheckCheck,
   AlertTriangle,
   XCircle,
   Globe,
   Search,
-  KeyRound
+  KeyRound,
+  Plus
 } from 'lucide-react';
-import type { ChatMessage, PipelineLead, ActivityLog } from '../types';
+import type { ChatMessage, ChatSession, PipelineLead, ActivityLog } from '../types';
 import { api } from '../services/api';
 
 const QUICK_PROMPTS = [
   "SaaS companies in the United States that may need AI automation",
   "Find 5 software companies without an official website and draft website-development emails",
   "Find B2B fintech startups in California that may need AI automation",
-  "Approve all pending outreach drafts",
-  "Show pipeline activity audit log",
 ];
 
 interface SendEmailModalState {
@@ -52,11 +50,41 @@ interface SendEmailModalState {
   sendError: string | null;
 }
 
-export const ChatbotUI: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+interface ChatbotUIProps {
+  session?: ChatSession;
+  onUpdateSessionMessages?: (sessionId: string, messages: ChatMessage[], newTitle?: string) => void;
+  onNewChat?: () => void;
+}
+
+export const ChatbotUI: React.FC<ChatbotUIProps> = ({
+  session,
+  onUpdateSessionMessages,
+  onNewChat,
+}) => {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => session?.messages || []);
   const [input, setInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Sync internal messages whenever active session switches
+  useEffect(() => {
+    if (session) {
+      setMessages(session.messages || []);
+    }
+  }, [session?.id]);
+
+  const updateMessages = (
+    updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[]),
+    customTitle?: string
+  ) => {
+    setMessages((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (session && onUpdateSessionMessages) {
+        onUpdateSessionMessages(session.id, next, customTitle);
+      }
+      return next;
+    });
+  };
 
   // In-chat editing state for outreach drafts
   const [editingDraftId, setEditingDraftId] = useState<number | null>(null);
@@ -125,7 +153,14 @@ export const ChatbotUI: React.FC = () => {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Auto-generate a title from the first prompt if session still has default title
+    let firstMessageTitle: string | undefined = undefined;
+    if (session && (session.title === 'New Chat' || !session.title) && messages.length === 0) {
+      const clean = text.replace(/^["']|["']$/g, '').trim();
+      firstMessageTitle = clean.length > 36 ? `${clean.substring(0, 36)}...` : clean;
+    }
+
+    updateMessages((prev) => [...prev, userMessage], firstMessageTitle);
     setInput('');
     setIsLoading(true);
 
@@ -148,7 +183,7 @@ export const ChatbotUI: React.FC = () => {
         total_candidates: response.total_candidates,
       };
 
-      setMessages((prev) => [...prev, agentMessage]);
+      updateMessages((prev) => [...prev, agentMessage]);
       loadActivityLogs();
     } catch (err: any) {
       const errorMessage: ChatMessage = {
@@ -157,7 +192,7 @@ export const ChatbotUI: React.FC = () => {
         content: `Connection error: ${err.message || 'Agent backend unavailable'}. Please verify that the server is running.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      updateMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -199,7 +234,7 @@ export const ChatbotUI: React.FC = () => {
       });
 
       // Update message state
-      setMessages((prev) =>
+      updateMessages((prev) =>
         prev.map((msg) => {
           if (msg.id !== messageId || !msg.pipeline_leads) return msg;
           return {
@@ -232,7 +267,7 @@ export const ChatbotUI: React.FC = () => {
       await api.approveDraft(draftId);
 
       // Update message state in-place
-      setMessages((prev) =>
+      updateMessages((prev) =>
         prev.map((msg) => {
           if (msg.id !== messageId || !msg.pipeline_leads) return msg;
           return {
@@ -293,7 +328,7 @@ export const ChatbotUI: React.FC = () => {
       });
 
       // Update lead state across messages
-      setMessages((prev) =>
+      updateMessages((prev) =>
         prev.map((msg) => {
           if (!msg.pipeline_leads) return msg;
           return {
@@ -376,7 +411,7 @@ export const ChatbotUI: React.FC = () => {
       });
 
       // Update message state
-      setMessages((prev) =>
+      updateMessages((prev) =>
         prev.map((msg) => {
           if (msg.id !== messageId || !msg.pipeline_leads) return msg;
           return {
@@ -408,11 +443,51 @@ export const ChatbotUI: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#080809] bg-grid-lines text-slate-100 flex flex-col font-sans selection:bg-[#f95721] selection:text-white">
-      {/* Main Chat Interface */}
-      <div className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 flex flex-col justify-between">
-        {/* Messages Feed or Empty State */}
-        <div className="flex-1 overflow-y-auto space-y-6 mb-6 pr-1 min-h-[50vh]">
+    <div className="relative h-full flex-1 bg-[#080809] bg-grid-lines text-slate-100 flex flex-col font-sans selection:bg-[#f95721] selection:text-white overflow-hidden">
+      {/* Top Session Header Bar */}
+      <div className="h-11 border-b border-[#1c1c24] bg-[#0a0a0d]/90 backdrop-blur-md px-4 flex items-center justify-between shrink-0 z-10">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="h-6 w-6 rounded-lg bg-[#f95721]/15 border border-[#f95721]/30 flex items-center justify-center text-[#f95721] shrink-0">
+            <Flame className="w-3.5 h-3.5 fill-current" />
+          </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-xs text-white truncate max-w-[180px] sm:max-w-xs md:max-w-md">
+              {session?.title || 'AI Sales Agent'}
+            </span>
+            {messages.length > 0 && (
+              <span className="text-[10px] text-slate-400 font-mono bg-[#14141c] px-2 py-0.5 rounded-full border border-[#22222e] shrink-0 hidden sm:inline-block">
+                {messages.length} {messages.length === 1 ? 'msg' : 'msgs'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {onNewChat && (
+            <button
+              type="button"
+              onClick={onNewChat}
+              className="px-2.5 py-1 rounded-lg bg-[#14141c] hover:bg-[#1e1e28] border border-[#242432] hover:border-[#f95721]/50 text-xs text-slate-200 hover:text-white flex items-center gap-1.5 transition-all shadow-sm group"
+              title="Start a new conversation"
+            >
+              <Plus className="w-3.5 h-3.5 text-[#f95721] group-hover:rotate-90 transition-transform" />
+              <span className="font-medium text-[11px]">New Chat</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsActivityDrawerOpen(true)}
+            className="p-1.5 rounded-lg bg-[#14141c] hover:bg-[#1c1c26] border border-[#22222e] text-slate-400 hover:text-white transition-colors"
+            title="Activity Audit Log"
+          >
+            <History className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Scrollable Messages Feed (Scrollbar Hidden) */}
+      <div className="flex-1 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden px-4 pt-4 pb-4">
+        <div className="max-w-4xl w-full mx-auto space-y-6">
           {messages.length === 0 ? (
             /* Empty State */
             <div className="h-full flex flex-col items-center justify-center text-center py-8 animate-fade-in">
@@ -420,11 +495,8 @@ export const ChatbotUI: React.FC = () => {
                 <Flame className="w-7 h-7 fill-current" />
               </div>
               <h1 className="text-2xl font-bold text-white tracking-tight">
-                Autonomous B2B Lead Operations
+                LeadFlow AI Agent
               </h1>
-              <p className="text-xs sm:text-sm text-slate-400 mt-2 max-w-lg leading-relaxed">
-                General-purpose sales operations pipeline: Dynamic criteria parsing ➔ Firecrawl web research ➔ Gemini qualification gates ➔ Hunter.io contact discovery ➔ Gemini email drafting ➔ Human review & Gmail SMTP sending.
-              </p>
 
               {/* Featured Starter Prompts */}
               <div className="mt-6 w-full max-w-xl space-y-2.5">
@@ -432,18 +504,8 @@ export const ChatbotUI: React.FC = () => {
                   onClick={() => handleSend("SaaS companies in the United States that may need AI automation")}
                   className="w-full p-3.5 rounded-xl bg-gradient-to-r from-[#17171d] via-[#1c1c24] to-[#17171d] hover:border-[#f95721]/50 border border-[#2b2b38] text-left transition-all group shadow-lg flex items-center justify-between"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#f95721] text-white">
-                        Standard Workflow
-                      </span>
-                      <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
-                        <CheckCheck className="w-3 h-3" /> US B2B SaaS
-                      </span>
-                    </div>
-                    <div className="text-sm font-bold text-white group-hover:text-[#f95721] transition-colors">
-                      "SaaS companies in the United States that may need AI automation"
-                    </div>
+                  <div className="text-sm font-bold text-white group-hover:text-[#f95721] transition-colors">
+                    "SaaS companies in the United States that may need AI automation"
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-[#f95721]/20 border border-[#f95721]/40 flex items-center justify-center text-[#f95721] shrink-0 ml-3">
                     <Zap className="w-4 h-4 fill-current" />
@@ -454,16 +516,8 @@ export const ChatbotUI: React.FC = () => {
                   onClick={() => handleSend("Find 5 software companies without an official website and draft website-development emails")}
                   className="w-full p-3.5 rounded-xl bg-[#121217] hover:bg-[#181820] hover:border-amber-500/40 border border-[#252532] text-left transition-all group shadow-md flex items-center justify-between"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        Website Pitch Workflow
-                      </span>
-                      <span className="text-[11px] text-amber-400 font-medium">No Official Website</span>
-                    </div>
-                    <div className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-amber-300 transition-colors">
-                      "Find 5 software companies without an official website and draft website-development emails"
-                    </div>
+                  <div className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-amber-300 transition-colors">
+                    "Find 5 software companies without an official website and draft website-development emails"
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 ml-3">
                     <Globe className="w-4 h-4" />
@@ -474,16 +528,8 @@ export const ChatbotUI: React.FC = () => {
                   onClick={() => handleSend("Find B2B fintech startups in California that may need AI automation")}
                   className="w-full p-3.5 rounded-xl bg-[#121217] hover:bg-[#181820] hover:border-blue-500/40 border border-[#252532] text-left transition-all group shadow-md flex items-center justify-between"
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                        Strict Geography Workflow
-                      </span>
-                      <span className="text-[11px] text-blue-400 font-medium">California, USA</span>
-                    </div>
-                    <div className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-blue-300 transition-colors">
-                      "Find B2B fintech startups in California that may need AI automation"
-                    </div>
+                  <div className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-blue-300 transition-colors">
+                    "Find B2B fintech startups in California that may need AI automation"
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 ml-3">
                     <MapPin className="w-4 h-4" />
@@ -587,50 +633,7 @@ export const ChatbotUI: React.FC = () => {
                     {/* 8-Step Pipeline Stepper Banner */}
                     {msg.pipeline_leads && msg.pipeline_leads.length > 0 && (
                       <div className="mt-4 pt-3 border-t border-[#22222e]">
-                        <div className="mb-4 bg-[#0d0d10] p-3 rounded-xl border border-[#1f1f28]">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-                            <span className="flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-[#f95721]" />
-                              Pipeline Workflow Execution
-                            </span>
-                            <span className="text-emerald-400 font-mono">COMPLETE</span>
-                          </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
-                            <div className="p-1.5 rounded-lg bg-[#15151c] border border-emerald-500/20 text-slate-300 flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">1. Criteria Parsed</span>
-                            </div>
-                            <div className="p-1.5 rounded-lg bg-[#15151c] border border-emerald-500/20 text-slate-300 flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">2. Firecrawl Discovery</span>
-                            </div>
-                            <div className="p-1.5 rounded-lg bg-[#15151c] border border-emerald-500/20 text-slate-300 flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">3. Website Intel</span>
-                            </div>
-                            <div className="p-1.5 rounded-lg bg-[#15151c] border border-emerald-500/20 text-slate-300 flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">4. Gemini Scored</span>
-                            </div>
-                            <div className="p-1.5 rounded-lg bg-[#15151c] border border-emerald-500/20 text-slate-300 flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">5. Hunter.io Lookup</span>
-                            </div>
-                            <div className="p-1.5 rounded-lg bg-[#15151c] border border-emerald-500/20 text-slate-300 flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              <span className="truncate">6. Outreach Drafted</span>
-                            </div>
-                            <div className="p-1.5 rounded-lg bg-[#15151c] border border-amber-500/30 text-amber-300 flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                              <span className="truncate">7. Human Review</span>
-                            </div>
-                            <div className="p-1.5 rounded-lg bg-[#15151c] border border-blue-500/30 text-blue-300 flex items-center gap-1.5">
-                              <Send className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                              <span className="truncate">8. Gmail SMTP Send</span>
-                            </div>
-                          </div>
-                        </div>
 
                         {/* Lead Cards List */}
                         <div className="space-y-5">
@@ -1209,77 +1212,54 @@ export const ChatbotUI: React.FC = () => {
             })
           )}
 
-          {/* Loading Indicator */}
+          {/* Minimal Thinking Indicator */}
           {isLoading && (
-            <div className="flex items-start gap-3 justify-start animate-fade-in">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-[#f95721] to-[#ff7d47] flex items-center justify-center text-white shrink-0 shadow-md mt-0.5 animate-pulse">
-                <Flame className="w-4 h-4 fill-current" />
+            <div className="flex items-center gap-2.5 justify-start animate-fade-in py-1">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-tr from-[#f95721] to-[#ff7d47] flex items-center justify-center text-white shrink-0 shadow-sm">
+                <Flame className="w-3.5 h-3.5 fill-current" />
               </div>
-              <div className="px-5 py-4 rounded-2xl bg-[#121216] border border-[#24242e] rounded-tl-sm text-xs text-slate-300 space-y-2 shadow-lg max-w-lg">
-                <div className="flex items-center gap-2 font-bold text-white">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#f95721] animate-ping" />
-                  <span>Executing 8-Step Sales Operations Pipeline...</span>
-                </div>
-                <div className="text-[11px] text-slate-400 space-y-1 font-mono">
-                  <div className="flex items-center gap-1.5 text-slate-300">
-                    <span className="text-emerald-400">✓</span> 1. Parsing search criteria & geography
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-300">
-                    <span className="text-emerald-400">✓</span> 2. Discovering matching company candidates
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-300">
-                    <span className="text-[#f95721] animate-pulse">➔</span> 3. Firecrawl scraping website profiles & signals...
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <span>○</span> 4. Google Gemini evaluating target qualification gates
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <span>○</span> 5. Hunter.io identifying verified decision-makers
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <span>○</span> 6. Gemini drafting evidence-grounded outreach
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <span>○</span> 7. Presenting for human review & approval
-                  </div>
-                  <div className="flex items-center gap-1.5 text-slate-400">
-                    <span>○</span> 8. Audit logging & Gmail SMTP integration
-                  </div>
-                </div>
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#121216] border border-[#24242e] text-xs text-slate-300 shadow-sm">
+                <span className="font-medium">Thinking</span>
+                <span className="flex items-center gap-1 ml-0.5">
+                  <span className="h-1 w-1 rounded-full bg-[#f95721] animate-bounce [animation-delay:-0.3s]" />
+                  <span className="h-1 w-1 rounded-full bg-[#f95721] animate-bounce [animation-delay:-0.15s]" />
+                  <span className="h-1 w-1 rounded-full bg-[#f95721] animate-bounce" />
+                </span>
               </div>
             </div>
           )}
 
           <div ref={messagesEndRef} />
         </div>
+      </div>
 
-        {/* Chat Input Card */}
-        <div className="bg-[#121216] border border-[#24242e] rounded-2xl p-3.5 shadow-2xl relative">
-          <textarea
-            ref={inputRef}
-            rows={2}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="E.g. SaaS companies in the United States that may need AI automation..."
-            className="w-full bg-transparent text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none leading-relaxed"
-          />
-
-          <div className="flex items-center justify-between pt-2.5 border-t border-[#1c1c24] mt-1">
-            <div className="flex items-center gap-2 text-slate-500 text-xs">
-              <span className="hidden sm:inline text-[11px] text-slate-400">
-                Press <kbd className="px-1.5 py-0.5 rounded bg-[#1c1c22] border border-[#2b2b36] font-mono text-[10px] text-slate-300">Enter</kbd> to run pipeline
-              </span>
-            </div>
+      {/* Always Sticky Chat Input Card at Bottom */}
+      <div className="shrink-0 w-full z-20 pb-2 pt-1 bg-gradient-to-t from-[#080809] via-[#080809]/95 to-transparent">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="bg-[#121216] border border-[#24242e] rounded-2xl p-2.5 sm:p-3 shadow-2xl relative flex items-end gap-2.5">
+            <textarea
+              ref={inputRef}
+              rows={2}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="E.g. SaaS companies in the United States that may need AI automation..."
+              className="flex-1 bg-transparent text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none leading-relaxed py-1"
+            />
 
             <button
               type="button"
               onClick={() => handleSend()}
               disabled={isLoading || !input.trim()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#f95721] hover:bg-[#ea4710] disabled:bg-[#f95721]/30 text-white text-xs font-bold shadow-md shadow-[#f95721]/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed"
+              aria-label="Send message"
+              title="Send message"
+              className="h-9 w-9 rounded-xl bg-[#f95721] hover:bg-[#ea4710] disabled:bg-[#1e1e26] disabled:text-slate-600 text-white flex items-center justify-center shadow-md shadow-[#f95721]/20 transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed shrink-0"
             >
-              <span>{isLoading ? 'Processing Pipeline...' : 'Run LeadFlow Pipeline'}</span>
-              <Send className="w-3.5 h-3.5" />
+              {isLoading ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
