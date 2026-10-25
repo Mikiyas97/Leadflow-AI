@@ -135,16 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* New Run Primary CTA */}
           <div className="p-3">
-            <button
-              onClick={() => {
-                onOpenDiscovery();
-                onCloseMobile();
-              }}
-              className="w-full py-2.5 px-3.5 rounded-xl bg-gradient-to-r from-[#f95721] via-[#ea4710] to-[#f95721] hover:brightness-110 text-white text-xs font-bold shadow-md shadow-[#f95721]/25 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] group"
-            >
-              <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-              <span>Launch Discovery Run</span>
-            </button>
+
           </div>
 
           {/* Navigation Links */}
@@ -252,8 +243,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     onCloseMobile();
                                   }}
                                   className={`group/sess w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-all ${isCurrent
-                                      ? 'bg-[#1b1b28] text-white font-medium border border-[#2f2f44] shadow-sm'
-                                      : 'text-slate-400 hover:text-slate-200 hover:bg-[#13131a]'
+                                    ? 'bg-[#1b1b28] text-white font-medium border border-[#2f2f44] shadow-sm'
+                                    : 'text-slate-400 hover:text-slate-200 hover:bg-[#13131a]'
                                     }`}
                                   title={sess.title}
                                 >
