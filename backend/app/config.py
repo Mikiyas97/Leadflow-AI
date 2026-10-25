@@ -1,6 +1,11 @@
 """LeadFlow AI - Application Configuration"""
 import os
+from pathlib import Path
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+DEFAULT_DB_FILE = BASE_DIR / "leadflow.db"
 
 
 class Settings(BaseSettings):
@@ -15,7 +20,14 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
 
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./leadflow.db")
+    DATABASE_URL: str = f"sqlite:///{DEFAULT_DB_FILE.as_posix()}"
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def resolve_sqlite_url(cls, v: str) -> str:
+        if not v or v in ("sqlite:///./leadflow.db", "sqlite:///leadflow.db"):
+            return f"sqlite:///{DEFAULT_DB_FILE.as_posix()}"
+        return v
 
     # API Keys
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")

@@ -4,24 +4,22 @@ import {
   LayoutDashboard,
   Users,
   MailCheck,
-  Sliders,
   History,
   Sparkles,
-  KeyRound,
   MessageSquareCode,
   Compass,
   ChevronRight,
   X
 } from 'lucide-react';
 
-export type ActiveTab = 'agent' | 'dashboard' | 'search-leads' | 'manage-leads' | 'outreach' | 'criteria' | 'activity';
+export type ActiveTab = 'agent' | 'dashboard' | 'search-leads' | 'manage-leads' | 'outreach' | 'activity';
 
 interface SidebarProps {
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
   onOpenDiscovery: () => void;
-  onOpenTestSmtp: () => void;
-  isBackendHealthy: boolean;
+  onOpenTestSmtp?: () => void;
+  isBackendHealthy?: boolean;
   overdueCount?: number;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
@@ -31,8 +29,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
   onOpenDiscovery,
-  onOpenTestSmtp,
-  isBackendHealthy,
   overdueCount = 0,
   isOpenMobile,
   onCloseMobile,
@@ -73,12 +69,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const secondaryNavItems = [
-    {
-      id: 'criteria' as ActiveTab,
-      label: 'Criteria & Schedules',
-      desc: 'ICP Profiles & FR-10 Cron',
-      icon: Sliders,
-    },
     {
       id: 'activity' as ActiveTab,
       label: 'Activity Audit Log',
@@ -280,46 +270,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
           </nav>
-        </div>
-
-        {/* Bottom Status & Utilities */}
-        <div className="p-3 border-t border-[#1c1c24] space-y-2.5 bg-[#08080b]">
-          
-          {/* Test SMTP Trigger Button */}
-          <button
-            onClick={() => {
-              onOpenTestSmtp();
-              onCloseMobile();
-            }}
-            className="w-full p-2 rounded-xl bg-[#121218] hover:bg-[#1a1a22] border border-[#22222e] hover:border-[#303040] text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-between transition-colors group"
-          >
-            <div className="flex items-center gap-2">
-              <KeyRound className="w-3.5 h-3.5 text-blue-400 group-hover:rotate-12 transition-transform" />
-              <span>Test Gmail SMTP</span>
-            </div>
-            <span className="text-[10px] text-slate-400">Port 587</span>
-          </button>
-
-          {/* Backend Health Card */}
-          <div className="p-2.5 rounded-xl bg-[#0e0e13] border border-[#1e1e28] flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div
-                className={`h-2.5 w-2.5 rounded-full ${
-                  isBackendHealthy
-                    ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
-                    : 'bg-red-500 animate-pulse shadow-sm shadow-red-500/50'
-                }`}
-              />
-              <span className="text-[11px] font-semibold text-slate-300">
-                {isBackendHealthy ? 'Backend Connected' : 'Offline / Reconnecting'}
-              </span>
-            </div>
-
-            <span className="text-[9px] font-mono text-slate-400 uppercase">
-              FastAPI
-            </span>
-          </div>
-
         </div>
 
       </aside>

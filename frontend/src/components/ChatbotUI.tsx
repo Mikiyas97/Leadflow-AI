@@ -521,8 +521,8 @@ export const ChatbotUI: React.FC = () => {
 
                   <div
                     className={`relative w-full ${isUser ? 'max-w-xl' : 'max-w-3xl'} px-4 py-3.5 rounded-2xl text-xs leading-relaxed ${isUser
-                        ? 'bg-[#1c1c24] text-slate-100 border border-[#2d2d38] rounded-tr-sm shadow-md'
-                        : 'bg-[#121216] text-slate-200 border border-[#24242e] rounded-tl-sm shadow-md'
+                      ? 'bg-[#1c1c24] text-slate-100 border border-[#2d2d38] rounded-tr-sm shadow-md'
+                      : 'bg-[#121216] text-slate-200 border border-[#24242e] rounded-tl-sm shadow-md'
                       }`}
                   >
                     {/* Content text */}
@@ -581,16 +581,6 @@ export const ChatbotUI: React.FC = () => {
                           </div>
                         )}
 
-                        {msg.qualified_count !== undefined && (
-                          <div className="flex items-center justify-between text-[11px] pt-1 text-slate-400 border-t border-[#1b1b24]">
-                            <span>
-                              Evaluated Candidates: <strong className="text-white">{msg.total_candidates ?? msg.pipeline_leads?.length ?? 0}</strong>
-                            </span>
-                            <span className={msg.qualified_count > 0 ? "text-emerald-400 font-semibold" : "text-amber-400 font-semibold"}>
-                              {msg.qualified_count} Qualified (Score ≥ 65 & Geography Verified)
-                            </span>
-                          </div>
-                        )}
                       </div>
                     )}
 
@@ -699,29 +689,6 @@ export const ChatbotUI: React.FC = () => {
                                     </div>
                                   </div>
 
-                                  {/* Rejection Reason */}
-                                  <div className="p-3 rounded-xl bg-[#1b1418] border border-rose-950/60 text-[11px] space-y-1.5">
-                                    <div className="font-bold text-rose-300 uppercase text-[10px] flex items-center gap-1.5">
-                                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-                                      <span>Qualification Gate Failure Analysis</span>
-                                    </div>
-                                    <p className="text-slate-300 leading-relaxed font-sans">
-                                      {lead.fit_reason || 'Candidate did not satisfy mandatory geography or fit thresholds.'}
-                                    </p>
-                                    {lead.fit_risks && lead.fit_risks.length > 0 && (
-                                      <div className="flex flex-wrap gap-1.5 pt-1">
-                                        {lead.fit_risks.map((risk, rIdx) => (
-                                          <span
-                                            key={rIdx}
-                                            className="text-[10px] px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-300 border border-rose-500/20"
-                                          >
-                                            ✕ {risk}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-
                                   {/* Outreach Skipped Banner */}
                                   <div className="p-2.5 rounded-xl bg-[#171216] border border-rose-900/30 text-rose-300/80 text-[11px] flex items-center justify-between">
                                     <span className="flex items-center gap-1.5">
@@ -796,11 +763,6 @@ export const ChatbotUI: React.FC = () => {
                                       <span className="text-slate-300">{lead.industry || 'B2B'}</span>
                                     </div>
 
-                                    {lead.website_evidence && (
-                                      <div className="text-[10px] text-slate-400 mt-1 italic">
-                                        {lead.website_evidence}
-                                      </div>
-                                    )}
                                   </div>
 
                                   {/* Gemini Fit Score Gauge */}
@@ -844,31 +806,6 @@ export const ChatbotUI: React.FC = () => {
                                   )}
                                 </div>
 
-                                {/* Step 4: Gemini Fit Assessment & Key Strengths */}
-                                {lead.fit_reason && (
-                                  <div className="bg-[#121217] rounded-xl p-3 border border-[#242430] space-y-2">
-                                    <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1.5">
-                                      <Sparkles className="w-3.5 h-3.5 text-[#f95721]" />
-                                      <span>Step 4 • Gemini Customer-Fit Assessment</span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-200 leading-relaxed font-sans">
-                                      {lead.fit_reason}
-                                    </p>
-
-                                    {lead.fit_strengths && lead.fit_strengths.length > 0 && (
-                                      <div className="flex flex-wrap gap-1.5 pt-1">
-                                        {lead.fit_strengths.map((str, sIdx) => (
-                                          <span
-                                            key={sIdx}
-                                            className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                                          >
-                                            ✓ {str}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
 
                                 {/* Step 5: Hunter.io Discovered Contacts */}
                                 <div className="bg-[#101014] rounded-xl p-3 border border-[#20202a] space-y-2 text-[11px]">
@@ -1498,8 +1435,8 @@ export const ChatbotUI: React.FC = () => {
               {testEmailFeedback && (
                 <div
                   className={`p-3 rounded-xl border text-[11px] leading-relaxed ${testEmailFeedback.success
-                      ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300'
-                      : 'bg-rose-950/30 border-rose-900/50 text-rose-300'
+                    ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-300'
+                    : 'bg-rose-950/30 border-rose-900/50 text-rose-300'
                     }`}
                 >
                   <div className="font-bold flex items-center gap-1.5 mb-1">
@@ -1600,10 +1537,10 @@ export const ChatbotUI: React.FC = () => {
                       <div className="flex items-center justify-between text-[10px]">
                         <span
                           className={`font-bold px-1.5 py-0.5 rounded ${isSuccess
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-                              : isWarning
-                                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
-                                : 'bg-blue-500/15 text-blue-400 border border-blue-500/25'
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+                            : isWarning
+                              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+                              : 'bg-blue-500/15 text-blue-400 border border-blue-500/25'
                             }`}
                         >
                           {log.action}

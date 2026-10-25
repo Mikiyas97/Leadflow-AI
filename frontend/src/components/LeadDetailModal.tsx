@@ -7,8 +7,6 @@ import {
   Sparkles,
   Users,
   Mail,
-  CheckCircle2,
-  AlertTriangle,
   RefreshCw,
   Calendar,
   Save,
@@ -244,52 +242,6 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                     </button>
                   </div>
 
-                  {/* Reason */}
-                  {lead.fit_reason && (
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                        Evaluation Reasoning & Synthesis
-                      </div>
-                      <div className="p-3.5 rounded-xl bg-[#0c0c10] border border-[#20202a] text-slate-300 leading-relaxed">
-                        {lead.fit_reason}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Strengths & Risks */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-1.5">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Qualification Strengths</span>
-                      </div>
-                      {lead.fit_strengths && lead.fit_strengths.length > 0 ? (
-                        <ul className="space-y-1 text-slate-300 list-disc pl-4 text-[11px]">
-                          {lead.fit_strengths.map((s, i) => (
-                            <li key={i}>{s}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="text-slate-500 text-[11px]">No specific strengths flagged.</div>
-                      )}
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-1.5">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        <span>Considerations & Risks</span>
-                      </div>
-                      {lead.fit_risks && lead.fit_risks.length > 0 ? (
-                        <ul className="space-y-1 text-slate-300 list-disc pl-4 text-[11px]">
-                          {lead.fit_risks.map((r, i) => (
-                            <li key={i}>{r}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="text-slate-500 text-[11px]">No operational risks identified.</div>
-                      )}
-                    </div>
-                  </div>
 
                   {/* Follow-up Touchpoint Scheduler Section */}
                   <div className="p-4 rounded-2xl bg-[#0c0c10] border border-[#20202a] space-y-3">

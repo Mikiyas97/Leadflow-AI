@@ -1,6 +1,8 @@
 export interface PipelineContact {
   id?: number | null;
-  name: string;
+  name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
   job_title?: string | null;
   email?: string | null;
   email_status: string;
@@ -116,6 +118,12 @@ export interface Lead {
   fit_risks?: string[] | null;
   status: 'NEW' | 'QUALIFIED' | 'UNQUALIFIED' | 'CONTACTED' | 'ARCHIVED';
   source_url?: string | null;
+  website_status?: string | null;
+  contacts?: Contact[];
+  drafts?: OutreachDraft[];
+  follow_up_date?: string | null;
+  follow_up_notes?: string | null;
+  follow_up_status?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -200,4 +208,29 @@ export interface DashboardStats {
   recent_runs: AutomationRun[];
   recent_activities: ActivityLog[];
 }
+
+export interface LeadSearchRequest {
+  campaign_name?: string;
+  target_business: string[];
+  service_offered: string;
+  location: string;
+  decision_makers: string[];
+  company_size?: string;
+  website_status: 'Any' | 'Missing' | 'Outdated' | 'Missing or Outdated' | string;
+  lead_quantity: number;
+  min_qualification_score: number;
+}
+
+export interface LeadSearchResponse {
+  campaign_name?: string | null;
+  pipeline_leads: PipelineLead[];
+  qualified_count: number;
+  total_candidates: number;
+  min_qualification_score: number;
+  search_summary: string;
+  run_id?: number | null;
+  logs?: ActivityLog[];
+}
+
+
 

@@ -18,6 +18,7 @@ from backend.app.services.discovery_service import discovery_service
 from backend.app.services.firecrawl_service import firecrawl_service
 from backend.app.services.hunter_service import hunter_service
 from backend.app.services.gemini_service import gemini_service
+from backend.app.services.pipeline_logger import pipeline_logger
 
 logger = logging.getLogger("leadflow.orchestrator")
 
@@ -64,6 +65,20 @@ async def execute_discovery_run(run_id: int):
                 company_size = company_size or profile.company_size
                 criteria = criteria or profile.criteria
 
+        pipeline_logger.log_start(
+            run_id=run.id,
+            campaign_name=f"Automated Pipeline #{run.id}",
+            target_businesses=[industry] if industry else [],
+            location=location or "Global",
+            service_offered=criteria or "B2B Outreach",
+            decision_makers=[],
+            company_size=company_size,
+            website_status="Any",
+            lead_quantity=max_leads,
+            min_qualification_score=65
+        )
+        pipeline_logger.log_discovery_query(query=industry or "Companies", location=location or "Any", status_filter="Any")
+
         # Step 1: Discover companies
         candidates = await discovery_service.discover_companies(
             industry=industry,
@@ -71,8 +86,10 @@ async def execute_discovery_run(run_id: int):
             company_size=company_size,
             limit=max_leads
         )
+        pipeline_logger.log_discovery_results(candidates)
 
-        for cand in candidates:
+        total_candidates = len(candidates)
+        for idx, cand in enumerate(candidates, 1):
             website = cand["website"]
             company_name = cand["company_name"]
 
@@ -137,6 +154,15 @@ async def execute_discovery_run(run_id: int):
             ))
             db.commit()
 
+            pipeline_logger.log_website_verification(
+                index=idx,
+                total=total_candidates,
+                company_name=company_name,
+                website=website,
+                website_status="HAS_OFFICIAL_WEBSITE",
+                evidence=research_res.get("description")
+            )
+
             # Step 3: AI Qualification via Gemini
             assessment = gemini_service.analyze_lead_suitability(
                 company_name=company_name,
@@ -156,6 +182,18 @@ async def execute_discovery_run(run_id: int):
                 run.leads_qualified += 1
 
             db.commit()
+
+            pipeline_logger.log_ai_qualification(
+                index=idx,
+                total=total_candidates,
+                company_name=company_name,
+                score=lead.fit_score or 0,
+                threshold=65,
+                status=lead.status,
+                reason=lead.fit_reason,
+                strengths=lead.fit_strengths,
+                risks=lead.fit_risks
+            )
 
             db.add(ActivityLog(
                 run_id=run.id,
@@ -209,6 +247,13 @@ async def execute_discovery_run(run_id: int):
 
             db.commit()
 
+            pipeline_logger.log_contacts(
+                company_name=company_name,
+                website=website,
+                decision_makers=[],
+                contacts=saved_contacts
+            )
+
             db.add(ActivityLog(
                 run_id=run.id,
                 lead_id=lead.id,
@@ -240,6 +285,12 @@ async def execute_discovery_run(run_id: int):
             run.drafts_generated += 1
             db.commit()
 
+            pipeline_logger.log_outreach_draft(
+                company_name=company_name,
+                recipient=primary_contact.name if primary_contact else "Decision-Maker",
+                subject=draft.subject
+            )
+
             db.add(ActivityLog(
                 run_id=run.id,
                 lead_id=lead.id,
@@ -254,6 +305,14 @@ async def execute_discovery_run(run_id: int):
         run.completed_at = datetime.utcnow()
         db.commit()
 
+        pipeline_logger.log_finish(
+            run_id=run.id,
+            total_evaluated=run.leads_discovered,
+            qualified_count=run.leads_qualified,
+            drafts_count=run.drafts_generated,
+            threshold=65
+        )
+
         finish_log = ActivityLog(
             run_id=run.id,
             action="RUN_COMPLETED",
@@ -265,6 +324,7 @@ async def execute_discovery_run(run_id: int):
 
     except Exception as e:
         logger.error(f"Error executing discovery run {run_id}: {e}", exc_info=True)
+        pipeline_logger.log_error(stage="Orchestrator Run", message=str(e))
         if run:
             run.status = "FAILED"
             run.error_summary = str(e)

@@ -19,6 +19,14 @@ from backend.app.services.gemini_service import gemini_service
 from backend.app.services.discovery_service import discovery_service
 from backend.app.services.firecrawl_service import firecrawl_service
 from backend.app.services.hunter_service import hunter_service
+from backend.app.services.pipeline_logger import pipeline_logger
+
+from backend.app.schemas import (
+    PipelineContact,
+    PipelineDraft,
+    PipelineLead,
+    LeadSearchRequest
+)
 
 logger = logging.getLogger("leadflow.chat")
 
@@ -33,6 +41,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     system_prompt: Optional[str] = None
+    criteria: Optional[LeadSearchRequest] = None
 
 
 class ParsedCriteria(BaseModel):
@@ -42,46 +51,6 @@ class ParsedCriteria(BaseModel):
     service_offered: str
     require_no_website: bool
 
-
-class PipelineContact(BaseModel):
-    id: Optional[int] = None
-    name: str
-    job_title: Optional[str] = None
-    email: Optional[str] = None
-    email_status: str = "unverified"
-    confidence_score: Optional[int] = None
-
-
-class PipelineDraft(BaseModel):
-    id: int
-    subject: str
-    body: str
-    status: str = "DRAFT"  # DRAFT, APPROVED, SENT, FAILED
-    approved_at: Optional[str] = None
-    sent_at: Optional[str] = None
-    send_error: Optional[str] = None
-
-
-class PipelineLead(BaseModel):
-    id: int
-    company_name: str
-    website: str
-    industry: Optional[str] = None
-    location: Optional[str] = None
-    company_size: Optional[str] = None
-    website_status: Optional[str] = "HAS_OFFICIAL_WEBSITE"
-    website_evidence: Optional[str] = None
-    fit_score: int
-    fit_reason: Optional[str] = None
-    fit_strengths: List[str] = []
-    fit_risks: List[str] = []
-    qualification_status: str = "QUALIFIED"  # QUALIFIED, UNQUALIFIED, REJECTED_MISMATCH
-    research_summary: Optional[str] = None
-    contacts: List[PipelineContact] = []
-    draft: Optional[PipelineDraft] = None
-    follow_up_date: Optional[str] = None
-    follow_up_notes: Optional[str] = None
-    follow_up_status: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -231,16 +200,34 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
         "leads", "search", "discover", "hotels", "hotel", "businesses",
         "get", "source", "hospitality", "website"
     ]
-    is_prospecting_request = any(kw in lower_text for kw in prospecting_keywords)
+    is_prospecting_request = payload.criteria is not None or any(kw in lower_text for kw in prospecting_keywords)
 
     if is_prospecting_request:
-        # Step 1: Parse criteria from user prompt with zero location loss
-        parsed = discovery_service.parse_search_query(latest_user_text)
-        industry = parsed["industry"]
-        location = parsed["location"]
-        target_qty = parsed["target_quantity"]
-        service_offered = parsed["service_offered"]
-        require_no_website = parsed["require_no_website"]
+        if payload.criteria:
+            crit = payload.criteria
+            industry = ", ".join(crit.target_business) if crit.target_business else "Businesses"
+            location = crit.location
+            target_qty = crit.lead_quantity
+            service_offered = crit.service_offered
+            website_status_req = crit.website_status
+            require_no_website = website_status_req in ("Missing", "Missing or Outdated")
+            score_threshold = crit.min_qualification_score
+            decision_makers = crit.decision_makers
+            company_size = crit.company_size if crit.company_size != "Any" else None
+            parsed_data = crit.dict()
+        else:
+            # Step 1: Parse criteria from user prompt with zero location loss
+            parsed = discovery_service.parse_search_query(latest_user_text)
+            industry = parsed["industry"] or "B2B Companies"
+            location = parsed["location"] or "Unspecified Location"
+            target_qty = parsed["target_quantity"]
+            service_offered = parsed["service_offered"]
+            require_no_website = parsed["require_no_website"]
+            website_status_req = "Missing" if require_no_website else "Any"
+            score_threshold = 60
+            decision_makers = []
+            company_size = parsed.get("company_size")
+            parsed_data = parsed
 
         parsed_obj = ParsedCriteria(
             industry=industry,
@@ -253,7 +240,7 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
         # Record automation run
         run = AutomationRun(
             status="RUNNING",
-            input_profile=parsed,
+            input_profile=parsed_data,
             started_at=datetime.now(timezone.utc)
         )
         db.add(run)
@@ -267,10 +254,24 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
             level="INFO",
             details=(
                 f"Criteria Parsed: Target {industry} in {location} "
-                f"(Quantity: {target_qty}, Service: {service_offered}, No-Website Constraint: {require_no_website})"
+                f"(Quantity: {target_qty}, Service: {service_offered}, Score Threshold: {score_threshold}, Website Status: {website_status_req})"
             )
         ))
         db.commit()
+
+        pipeline_logger.log_start(
+            run_id=run.id,
+            campaign_name="Chat Lead Prospecting",
+            target_businesses=payload.criteria.target_business if payload.criteria else [industry],
+            location=location,
+            service_offered=service_offered,
+            decision_makers=decision_makers or [],
+            company_size=company_size,
+            website_status=website_status_req,
+            lead_quantity=target_qty,
+            min_qualification_score=score_threshold
+        )
+        pipeline_logger.log_discovery_query(query=industry, location=location, status_filter=website_status_req)
 
         # Step 2: Discover matching companies in requested location
         existing_websites = [row[0] for row in db.query(Lead.website).all()]
@@ -280,9 +281,14 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
             location=location,
             service_offered=service_offered,
             require_no_website=require_no_website,
+            website_status=website_status_req,
+            company_size=company_size,
+            target_businesses=payload.criteria.target_business if payload.criteria else None,
             limit=target_qty,
             exclude_websites=existing_websites
         )
+
+        pipeline_logger.log_discovery_results(candidates)
 
         if not candidates:
             run.status = "COMPLETED"
@@ -298,6 +304,14 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
                 details=f"No matching candidates found in {location} for {industry} via live search."
             ))
             db.commit()
+
+            pipeline_logger.log_finish(
+                run_id=run.id,
+                total_evaluated=0,
+                qualified_count=0,
+                drafts_count=0,
+                threshold=score_threshold
+            )
 
             return ChatResponse(
                 role="assistant",
@@ -318,8 +332,9 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
             )
 
         pipeline_leads_result: List[PipelineLead] = []
+        total_candidates = len(candidates)
 
-        for cand in candidates:
+        for idx, cand in enumerate(candidates, 1):
             company_name = cand["company_name"]
             website = cand["website"]
             cand_location = cand.get("location", location)
@@ -371,6 +386,15 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
             db.add(research_record)
             db.commit()
 
+            pipeline_logger.log_website_verification(
+                index=idx,
+                total=total_candidates,
+                company_name=company_name,
+                website=website,
+                website_status=website_status,
+                evidence=website_evidence
+            )
+
             # Step 4: Strict Qualification Gates
             assessment = gemini_service.analyze_lead_suitability(
                 company_name=company_name,
@@ -382,7 +406,11 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
                 actual_location=cand_location,
                 service_offered=service_offered,
                 require_no_website=require_no_website,
-                website_status=website_status
+                website_status=website_status,
+                min_qualification_score=score_threshold,
+                requested_website_status=website_status_req,
+                decision_makers=decision_makers,
+                company_size=company_size
             )
 
             lead.fit_score = assessment.get("fit_score", 0)
@@ -392,7 +420,19 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
             lead.status = assessment.get("status", "UNQUALIFIED")
             db.commit()
 
-            is_qualified = lead.status == "QUALIFIED" and (lead.fit_score or 0) >= 65
+            is_qualified = lead.status == "QUALIFIED" and (lead.fit_score or 0) >= score_threshold
+
+            pipeline_logger.log_ai_qualification(
+                index=idx,
+                total=total_candidates,
+                company_name=company_name,
+                score=lead.fit_score or 0,
+                threshold=score_threshold,
+                status=lead.status,
+                reason=lead.fit_reason,
+                strengths=lead.fit_strengths,
+                risks=lead.fit_risks
+            )
 
             # Log Step 4
             db.add(ActivityLog(
@@ -400,7 +440,7 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
                 lead_id=lead.id,
                 action="LEAD_QUALIFIED" if is_qualified else "LEAD_REJECTED",
                 level="SUCCESS" if is_qualified else "INFO",
-                details=f"Step 4: AI Qualification score {lead.fit_score}/100. Status: {lead.status}. Reason: {lead.fit_reason}"
+                details=f"Step 4: AI Qualification score {lead.fit_score}/100 (Threshold: {score_threshold}). Status: {lead.status}. Reason: {lead.fit_reason}"
             ))
             db.commit()
 
@@ -418,6 +458,14 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
                     finder_contact = await hunter_service.find_email(domain=website, full_name=named_person, company=company_name)
                     if finder_contact:
                         raw_contacts.insert(0, finder_contact)
+
+                # Prioritize decision-makers in contact ranking
+                if decision_makers:
+                    dm_lowers = [dm.lower() for dm in decision_makers]
+                    raw_contacts.sort(
+                        key=lambda c: any(dm in (c.get("job_title") or "").lower() for dm in dm_lowers),
+                        reverse=True
+                    )
 
                 # Check deliverability via Hunter Email Verifier
                 for rc in raw_contacts:
@@ -447,6 +495,13 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
                         email_status=contact.email_status,
                         confidence_score=contact.confidence_score
                     ))
+
+                pipeline_logger.log_contacts(
+                    company_name=company_name,
+                    website=website,
+                    decision_makers=decision_makers or [],
+                    contacts=saved_contacts
+                )
 
                 contact_log_msg = (
                     f"Hunter.io identified {len(saved_contacts)} contact(s)"
@@ -485,6 +540,12 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
                 db.add(draft)
                 db.commit()
                 db.refresh(draft)
+
+                pipeline_logger.log_outreach_draft(
+                    company_name=company_name,
+                    recipient=primary_contact.name if primary_contact else "Decision-Maker",
+                    subject=draft.subject
+                )
 
                 db.add(ActivityLog(
                     run_id=run.id,
@@ -533,6 +594,7 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
                 follow_up_status="AWAITING_EMAIL_SEND" if is_qualified else "DISQUALIFIED"
             ))
 
+        pipeline_leads_result = pipeline_leads_result[:target_qty]
         qualified_leads = [p for p in pipeline_leads_result if p.qualification_status == "QUALIFIED"]
         run.status = "COMPLETED"
         run.completed_at = datetime.now(timezone.utc)
@@ -541,27 +603,37 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
         run.drafts_generated = sum(1 for p in pipeline_leads_result if p.draft is not None)
         db.commit()
 
+        pipeline_logger.log_finish(
+            run_id=run.id,
+            total_evaluated=len(pipeline_leads_result),
+            qualified_count=len(qualified_leads),
+            drafts_count=run.drafts_generated,
+            threshold=score_threshold
+        )
+
         # Build accurate status report
         if not qualified_leads:
             conversational_summary = (
                 f"⚠️ **Completed — 0 qualified leads**\n\n"
                 f"**Parsed Search Criteria:**\n"
-                f"• **Industry:** {industry}\n"
+                f"• **Industry/Business:** {industry}\n"
                 f"• **Location:** {location}\n"
                 f"• **Target Quantity:** {target_qty}\n"
                 f"• **Service Offered:** {service_offered}\n"
-                f"• **Constraint:** {'Must lack official website' if require_no_website else 'Standard'}\n\n"
-                f"Evaluated {len(pipeline_leads_result)} candidate(s). None met the qualification threshold (score >= 65 and location match). "
+                f"• **Website Status:** {website_status_req}\n"
+                f"• **Min Score:** {score_threshold}\n\n"
+                f"Evaluated {len(pipeline_leads_result)} candidate(s). None met the qualification threshold (score >= {score_threshold} and location match). "
                 f"Disqualified candidates are shown below with detailed reasoning."
             )
         else:
             conversational_summary = (
                 f"🎯 **LeadFlow Pipeline Completed: {len(qualified_leads)} of {len(pipeline_leads_result)} Leads Qualified**\n\n"
                 f"**Parsed Search Criteria:**\n"
-                f"• **Industry:** {industry}\n"
+                f"• **Industry/Business:** {industry}\n"
                 f"• **Location:** {location}\n"
                 f"• **Service Offered:** {service_offered}\n"
-                f"• **Constraint:** {'Must lack official website' if require_no_website else 'Standard'}\n\n"
+                f"• **Website Status:** {website_status_req}\n"
+                f"• **Min Score:** {score_threshold}\n\n"
                 f"Review the evaluated prospects below. Inspect research evidence, edit or approve drafts, "
                 f"and send via Gmail SMTP when ready:"
             )
@@ -590,8 +662,7 @@ async def chat_with_agent(payload: ChatRequest, db: Session = Depends(get_db)):
             from google.genai import types
             contents = [f"{m.role.upper()}: {m.content}" for m in payload.messages[-6:]]
             full_prompt = f"{system_instruction}\n\n" + "\n\n".join(contents) + "\n\nASSISTANT:"
-            response = gemini_service.client.models.generate_content(
-                model="gemini-2.5-flash",
+            response = gemini_service.generate_content_with_fallback(
                 contents=full_prompt,
                 config=types.GenerateContentConfig(temperature=0.7)
             )

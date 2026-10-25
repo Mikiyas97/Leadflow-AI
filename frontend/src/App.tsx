@@ -5,7 +5,6 @@ import { DashboardView } from './components/DashboardView';
 import { SearchLeadsView } from './components/SearchLeadsView';
 import { ManageLeadsView } from './components/ManageLeadsView';
 import { OutreachReviewView } from './components/OutreachReviewView';
-import { CriteriaAndSchedulesView } from './components/CriteriaAndSchedulesView';
 import { ActivityFeedView } from './components/ActivityFeedView';
 import { LeadDetailModal } from './components/LeadDetailModal';
 import { DiscoveryModal } from './components/DiscoveryModal';
@@ -14,7 +13,17 @@ import { api } from './services/api';
 import { KeyRound, Send, CheckCircle2, AlertCircle, Menu, Flame } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('agent');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    try {
+      const saved = localStorage.getItem('leadflow_active_tab');
+      if (saved && ['agent', 'dashboard', 'search-leads', 'manage-leads', 'outreach', 'activity'].includes(saved)) {
+        return saved as ActiveTab;
+      }
+    } catch {
+      // ignore
+    }
+    return 'agent';
+  });
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loadingStats, setLoadingStats] = useState<boolean>(true);
   const [isBackendHealthy, setIsBackendHealthy] = useState<boolean>(true);
@@ -30,6 +39,14 @@ export const App: React.FC = () => {
   const [testEmailRecipient, setTestEmailRecipient] = useState<string>('');
   const [isSendingTestEmail, setIsSendingTestEmail] = useState<boolean>(false);
   const [testEmailFeedback, setTestEmailFeedback] = useState<{ success: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('leadflow_active_tab', activeTab);
+    } catch {
+      // ignore
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     checkHealthAndLoadStats();
@@ -149,13 +166,14 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'search-leads' && (
+          <div className={activeTab === 'search-leads' ? 'flex-1 flex flex-col' : 'hidden'}>
             <SearchLeadsView
               onSelectLead={(id) => setSelectedLeadId(id)}
               onNavigateToManage={() => setActiveTab('manage-leads')}
+              onNavigateToOutreach={() => setActiveTab('outreach')}
               onRefreshParentStats={loadStatsSilently}
             />
-          )}
+          </div>
 
           {activeTab === 'manage-leads' && (
             <ManageLeadsView
@@ -167,16 +185,6 @@ export const App: React.FC = () => {
 
           {activeTab === 'outreach' && (
             <OutreachReviewView onRefreshStats={loadStatsSilently} />
-          )}
-
-          {activeTab === 'criteria' && (
-            <CriteriaAndSchedulesView
-              onOpenDiscoveryWithProfile={(p) => {
-                setDiscoveryProfile(p);
-                setIsDiscoveryOpen(true);
-              }}
-              onRefreshDashboard={loadStatsSilently}
-            />
           )}
 
           {activeTab === 'activity' && <ActivityFeedView />}

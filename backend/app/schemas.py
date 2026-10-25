@@ -116,6 +116,7 @@ class LeadBase(BaseModel):
     industry: Optional[str] = None
     location: Optional[str] = None
     company_size: Optional[str] = None
+    website_status: Optional[str] = None
 
 
 class LeadCreate(LeadBase):
@@ -148,6 +149,8 @@ class LeadResponse(LeadBase):
     follow_up_date: Optional[datetime] = None
     follow_up_notes: Optional[str] = None
     follow_up_status: Optional[str] = None
+    contacts: List[ContactResponse] = []
+    drafts: List[OutreachDraftResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -289,3 +292,72 @@ class DiscoveryScheduleResponse(DiscoveryScheduleBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
+# Lead Search & Pipeline Execution Schemas
+# ==========================================
+class PipelineContact(BaseModel):
+    id: Optional[int] = None
+    name: str
+    job_title: Optional[str] = None
+    email: Optional[str] = None
+    email_status: str = "unverified"
+    confidence_score: Optional[int] = None
+
+
+class PipelineDraft(BaseModel):
+    id: int
+    subject: str
+    body: str
+    status: str = "DRAFT"  # DRAFT, APPROVED, SENT, FAILED
+    approved_at: Optional[str] = None
+    sent_at: Optional[str] = None
+    send_error: Optional[str] = None
+
+
+class PipelineLead(BaseModel):
+    id: int
+    company_name: str
+    website: str
+    industry: Optional[str] = None
+    location: Optional[str] = None
+    company_size: Optional[str] = None
+    website_status: Optional[str] = "HAS_OFFICIAL_WEBSITE"
+    website_evidence: Optional[str] = None
+    fit_score: int
+    fit_reason: Optional[str] = None
+    fit_strengths: List[str] = []
+    fit_risks: List[str] = []
+    qualification_status: str = "QUALIFIED"  # QUALIFIED, UNQUALIFIED, REJECTED_MISMATCH
+    research_summary: Optional[str] = None
+    contacts: List[PipelineContact] = []
+    draft: Optional[PipelineDraft] = None
+    follow_up_date: Optional[str] = None
+    follow_up_notes: Optional[str] = None
+    follow_up_status: Optional[str] = None
+
+
+class LeadSearchRequest(BaseModel):
+    campaign_name: Optional[str] = Field(None, description="Campaign or search persona name")
+    target_business: List[str] = Field(default_factory=list, description="Target business types or industries (e.g. ['Hotels'])")
+    service_offered: str = Field(default="General B2B Services", description="Service or value proposition offered (e.g. Website development)")
+    location: str = Field(..., description="Target geographical location (e.g. Addis Ababa, Ethiopia)")
+    decision_makers: List[str] = Field(default_factory=list, description="Target decision-maker roles (e.g. ['Owner', 'General Manager'])")
+    company_size: Optional[str] = Field(default="Any", description="Optional company size filter (default: Any)")
+    website_status: str = Field(default="Any", description="Website status filter: Missing, Outdated, Missing or Outdated, Any")
+    lead_quantity: int = Field(default=10, ge=1, le=25, description="Number of leads to return (1-25)")
+    min_qualification_score: int = Field(default=60, ge=0, le=100, description="Minimum score threshold (0-100)")
+
+
+class LeadSearchResponse(BaseModel):
+    campaign_name: Optional[str] = None
+    pipeline_leads: List[PipelineLead]
+    qualified_count: int
+    total_candidates: int
+    min_qualification_score: int
+    search_summary: str
+    run_id: Optional[int] = None
+    logs: List[ActivityLogResponse] = []
+
+

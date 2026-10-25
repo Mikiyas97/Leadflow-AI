@@ -135,15 +135,12 @@ export const OutreachReviewView: React.FC<OutreachReviewViewProps> = ({ onRefres
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 animate-fade-in">
-      
+
       {/* Header Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             <span>Outreach Drafts & Approval</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#181822] text-[#f95721] border border-[#262634]">
-              FR-07 Compliant
-            </span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             Human-in-the-loop email review. Edit messaging, approve personalized copy, and dispatch via Gmail SMTP.
@@ -161,11 +158,10 @@ export const OutreachReviewView: React.FC<OutreachReviewViewProps> = ({ onRefres
             <button
               key={tab.id}
               onClick={() => setActiveFilter(tab.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeFilter === tab.id
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeFilter === tab.id
                   ? 'bg-[#f95721] text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -205,25 +201,23 @@ export const OutreachReviewView: React.FC<OutreachReviewViewProps> = ({ onRefres
             return (
               <div
                 key={draft.id}
-                className={`p-5 rounded-2xl border transition-all ${
-                  isSent
+                className={`p-5 rounded-2xl border transition-all ${isSent
                     ? 'bg-[#101318] border-indigo-500/30'
                     : isApproved
-                    ? 'bg-[#101614] border-emerald-500/30'
-                    : 'bg-[#121217] border-[#22222c] hover:border-[#2e2e3c]'
-                }`}
+                      ? 'bg-[#101614] border-emerald-500/30'
+                      : 'bg-[#121217] border-[#22222c] hover:border-[#2e2e3c]'
+                  }`}
               >
                 {/* Header Row */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#1e1e28]">
                   <div className="flex items-center gap-3">
                     <span
-                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                        isSent
+                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${isSent
                           ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25'
                           : isApproved
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
-                          : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
-                      }`}
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                        }`}
                     >
                       {draft.status}
                     </span>

@@ -1,6 +1,7 @@
 """LeadFlow AI - Gemini API Service for Lead Qualification and Outreach Drafting"""
 import json
 import logging
+import re
 from typing import Dict, Any, Optional, List
 from backend.app.config import settings
 
@@ -21,12 +22,59 @@ class GeminiService:
         self.client = None
         if self.api_key and GENAI_AVAILABLE:
             try:
-                self.client = genai.Client(api_key=self.api_key)
+                self.client = genai.Client(
+                    api_key=self.api_key,
+                    http_options=types.HttpOptions(
+                        retry_options=types.HttpRetryOptions(attempts=1),
+                        timeout=30000
+                    )
+                )
             except Exception as e:
                 logger.warning(f"Failed to initialize Gemini Client: {e}")
 
+    PRIMARY_MODEL = "gemini-3.8-flash"
+    FALLBACK_MODELS = [
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash-lite",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash",
+    ]
+
     def is_configured(self) -> bool:
         return bool(self.api_key and self.client)
+
+    def generate_content_with_fallback(self, contents: Any, config: Any = None) -> Any:
+        """
+        Calls primary model (gemini-3.8-flash), falling back through flash and flash-lite models
+        if 503 unavailable, rate-limited (429), or errored.
+        """
+        if not self.is_configured():
+            raise RuntimeError("Gemini service is not configured.")
+
+        models = [self.PRIMARY_MODEL] + self.FALLBACK_MODELS
+        last_exception = None
+
+        for model_name in models:
+            try:
+                kwargs = {"model": model_name, "contents": contents}
+                if config is not None:
+                    kwargs["config"] = config
+                response = self.client.models.generate_content(**kwargs)
+                if response and (response.text or getattr(response, "candidates", None)):
+                    return response
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    logger.info(f"Gemini model '{model_name}' reached quota limit. Trying next model in cascade...")
+                elif "503" in err_str or "UNAVAILABLE" in err_str:
+                    logger.info(f"Gemini model '{model_name}' temporarily unavailable (503). Trying next model in cascade...")
+                else:
+                    logger.info(f"Gemini model '{model_name}' unavailable ({type(e).__name__}). Trying next model in cascade...")
+                last_exception = e
+
+        raise last_exception or RuntimeError("All Gemini model generation attempts failed.")
 
     def optimize_search_target(self, user_prompt: str) -> Dict[str, Any]:
         """
@@ -46,8 +94,7 @@ class GeminiService:
                     "'target_decision_makers': list of 2-3 target executive job titles."
                 )
                 prompt = f"{system_instruction}\n\nUser Request: {user_prompt}\n\nReturn strictly valid JSON only."
-                response = self.client.models.generate_content(
-                    model="gemini-2.5-flash",
+                response = self.generate_content_with_fallback(
                     contents=prompt,
                     config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
                 )
@@ -97,6 +144,169 @@ class GeminiService:
             "target_decision_makers": decision_makers
         }
 
+    @staticmethod
+    def _is_valid_company_name(name: str) -> bool:
+        """Determines if a candidate string is an individual commercial business, not an article/blog title."""
+        if not name or len(name.strip()) < 2:
+            return False
+        clean = name.strip()
+        lower = clean.lower()
+
+        # Reject headlines, listicles, trends, or editorial titles
+        article_patterns = [
+            r"^(?:\d+\s+)?(?:top|best|leading|fastest|greatest|notable|popular|key|innovative)\b",
+            r"^(?:list\s+of|directory\s+of|guide\s+to|a\s+guide\s+to|overview\s+of|how\s+to|why|what\s+is|meet\s+the)\b",
+            r"\b(?:startups|companies|businesses|hotels|firms|vendors)\s+in\b",
+            r"\b(?:landscape|ecosystem|roundup|rankings?|market\s+report|industry\s+report)\b",
+            r"\b(?:fintech|tech|saas)\s+startups\s+in\b",
+            r"\b(?:financial\s+landscape|is\s+evolving|unprecedented|need\s+to\s+know)\b",
+            r"\b(?:growing|rising|emerging|booming|evolving)\b",
+            r"\b(?:sector|industry|challenges?|opportunities?|trends?|outlook|overview|future\s+of|state\s+of)\b",
+            r"\b(?:investment|investing|funding|venture\s+capital)\b",
+            r"\b(?:in\s+ethiopia|in\s+africa|in\s+kenya|in\s+nigeria|in\s+egypt|in\s+ghana|in\s+rwanda)\b",
+            r"\b(?:ethiopia'?s|africa'?s|kenya'?s|nigeria'?s)\b",
+            r"\b(?:fintech\s+sector|fintech\s+landscape|banking\s+sector|tech\s+ecosystem)\b",
+        ]
+        for pat in article_patterns:
+            if re.search(pat, lower):
+                return False
+
+        # Known publisher/directory names
+        known_publishers = {
+            "fastercapital", "techcabal", "disrupt africa", "medium", "substack",
+            "forbes", "techcrunch", "wikipedia", "linkedin", "tripadvisor", "tracxn",
+            "crunchbase", "yellowpages", "clutch", "goodfirms", "g2", "glassdoor",
+            "indeed", "yelp", "booking.com", "expedia", "hotels.com", "bloomberg",
+            "reuters", "allafrica", "ventures africa", "the africa report"
+        }
+        if lower in known_publishers:
+            return False
+
+        # Reject long titles that resemble sentences (> 6 words without company suffixes)
+        words = clean.split()
+        if len(words) > 6 and not any(kw in lower for kw in ["limited", "ltd", "inc", "corp", "group", "holdings", "technologies", "solutions", "hotel", "resort"]):
+            return False
+
+        return True
+
+    @staticmethod
+    def _is_media_aggregator_domain(website: str, company_name: str) -> bool:
+        """Checks if a domain belongs to a blog, news outlet, or aggregator rather than a proprietary brand."""
+        if not website:
+            return False
+        w_lower = website.lower()
+        media_domains = [
+            "fastercapital.com", "techcabal.com", "disrupt-africa.com", "medium.com",
+            "substack.com", "forbes.com", "techcrunch.com", "wikipedia.org", "linkedin.com",
+            "tracxn.com", "crunchbase.com", "clutch.co", "goodfirms.co", "g2.com",
+            "glassdoor.com", "indeed.com", "venturesafrica.com", "theafricareport.com",
+            "africanbusiness.com", "bloomberg.com", "reuters.com", "allafrica.com"
+        ]
+        c_lower = company_name.lower().replace(" ", "")
+        for md in media_domains:
+            if md in w_lower and md.split(".")[0] not in c_lower:
+                return True
+        return False
+
+    def extract_companies_from_article(
+        self,
+        title: str,
+        content: str,
+        industry: Optional[str] = None,
+        location: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Extracts real, individual operating commercial companies/startups from blog posts,
+        listicles, or directory articles (e.g. 'Top Fintech Startups in Ethiopia').
+        Returns list of {'company_name': str, 'website': Optional[str], 'description': str}.
+        Never returns the blog/article title or publisher name as a company.
+        """
+        if self.is_configured():
+            try:
+                system_instruction = (
+                    "You are an expert B2B research specialist. A web search returned an article or listicle "
+                    "(e.g., 'Top Fintech Startups in Ethiopia'). "
+                    "Your job is to extract the ACTUAL INDIVIDUAL OPERATING COMPANIES or STARTUPS mentioned inside the text. "
+                    "CRITICAL RULES: "
+                    "1. NEVER return the article title, publisher (e.g. FasterCapital), or author as a company. "
+                    "2. Return a JSON array of up to 5 real commercial businesses mentioned in the content: "
+                    "[{\"company_name\": \"...\", \"website\": \"domain.com or null\", \"description\": \"...\"}]. "
+                    "3. Each entry MUST be a distinct operating enterprise in the target industry/location."
+                )
+                prompt = (
+                    f"{system_instruction}\n\n"
+                    f"Article Title: {title}\n"
+                    f"Target Industry: {industry or 'Business'}\n"
+                    f"Target Location: {location or 'Region'}\n"
+                    f"Article Content/Snippet:\n{content[:2000]}\n\n"
+                    f"Return strictly valid JSON array only."
+                )
+                from google.genai import types
+                response = self.generate_content_with_fallback(
+                    contents=prompt,
+                    config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.1)
+                )
+                raw = response.text.strip()
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    valid_companies = []
+                    for item in parsed:
+                        c_name = item.get("company_name", "").strip()
+                        if self._is_valid_company_name(c_name):
+                            valid_companies.append({
+                                "company_name": c_name,
+                                "website": item.get("website"),
+                                "description": item.get("description", f"{c_name} operating in {location or 'target region'}")
+                            })
+                    if valid_companies:
+                        return valid_companies
+            except Exception as e:
+                logger.warning(f"Gemini company extraction from article error: {e}. Using deterministic parsing.")
+
+        return self._deterministic_extract_companies_from_text(title, content, industry, location)
+
+    def _deterministic_extract_companies_from_text(
+        self,
+        title: str,
+        content: str,
+        industry: Optional[str] = None,
+        location: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Fallback deterministic extractor for companies mentioned in articles."""
+        extracted: List[Dict[str, Any]] = []
+        combined = f"{title}\n{content}"
+
+        # 1. Check for prominent Ethiopian fintechs if query matches
+        ind_loc = f"{industry or ''} {location or ''} {title} {content}".lower()
+        if "fintech" in ind_loc or ("ethiopia" in ind_loc and ("payment" in ind_loc or "finance" in ind_loc or "startup" in ind_loc)):
+            known_ethiopian_fintechs = [
+                ("Chapa", "chapa.co", "Payment gateway and financial technology provider in Ethiopia"),
+                ("ArifPay", "arifpay.net", "Licensed mobile POS and digital payment service in Ethiopia"),
+                ("SantimPay", "santimpay.com", "Digital payment gateway and mobile wallet solution in Ethiopia"),
+                ("Kifiya", "kifiya.com", "Digital finance and technology solutions provider in Ethiopia"),
+                ("EagleLion", "eaglelionsystems.com", "Financial technology and banking software developer in Ethiopia")
+            ]
+            for name, web, desc in known_ethiopian_fintechs:
+                if name.lower() in combined.lower() and not any(e["company_name"].lower() == name.lower() for e in extracted):
+                    extracted.append({
+                        "company_name": name,
+                        "website": web,
+                        "description": desc
+                    })
+
+        # 2. Look for numbered listicle items: "1. CompanyName", "1) CompanyName", "• CompanyName"
+        item_matches = re.findall(r"(?:^|\n|\.\s+)(?:\d+[\.\)]|[-•*])\s*([A-Z][a-zA-Z0-9\s&'-]{2,28}?)(?:\s*[-–:]|\s+is\s+|\s+provides\s+|\s+offers\s+|\s*\n)", combined)
+        for m in item_matches:
+            c_name = m.strip()
+            if self._is_valid_company_name(c_name) and not any(e["company_name"].lower() == c_name.lower() for e in extracted):
+                extracted.append({
+                    "company_name": c_name,
+                    "website": None,
+                    "description": f"Identified {c_name} operating in {industry or 'target sector'} in {location or 'target region'}."
+                })
+
+        return extracted[:5]
+
     def analyze_lead_suitability(
         self,
         company_name: str,
@@ -108,19 +318,48 @@ class GeminiService:
         actual_location: Optional[str] = None,
         service_offered: Optional[str] = None,
         require_no_website: bool = False,
-        website_status: Optional[str] = None
+        website_status: Optional[str] = None,
+        min_qualification_score: int = 60,
+        requested_website_status: Optional[str] = "Any",
+        decision_makers: Optional[List[str]] = None,
+        company_size: Optional[str] = "Any"
     ) -> Dict[str, Any]:
         """
         Evaluates a prospective lead against target criteria with strict qualification gates:
-        Gate 1: Location & Industry match.
-        Gate 2: Minimum score threshold (>= 65/100). Low scores (< 65) are flagged UNQUALIFIED.
-        Gate 3: Website constraint check (if user requires no official website).
+        Gate 0: Entity Validation (Must be an individual commercial company, NOT an article or blog).
+        Gate 1: Location match & Website constraint checks based on research evidence.
+        Gate 2: Dynamic score threshold (>= min_qualification_score). Scores below are UNQUALIFIED.
+        Gate 3: Company size treated as optional; decision-maker alignment rewarded.
         """
-        # --- GATE 1: Deterministic Geography & Constraint Checks ---
+        # --- GATE 0: Entity Validation (Must be a real company, not a blog post or listicle title) ---
+        if not self._is_valid_company_name(company_name):
+            return {
+                "fit_score": 0,
+                "fit_reason": f"Disqualified: '{company_name}' is a blog post, article title, or media aggregator, not an individual operating commercial enterprise.",
+                "fit_strengths": [],
+                "fit_risks": ["Not an individual commercial company (article/blog/listicle headline)"],
+                "status": "DISQUALIFIED",
+                "qualification_status": "DISQUALIFIED",
+                "is_qualified": False
+            }
+
+        # Gate 0B: Media aggregator domain rejection
+        if self._is_media_aggregator_domain(website, company_name):
+            return {
+                "fit_score": 0,
+                "fit_reason": f"Disqualified: Domain '{website}' is a media publication or directory platform, not the candidate's proprietary commercial website.",
+                "fit_strengths": [],
+                "fit_risks": ["Third-party media or directory domain"],
+                "status": "DISQUALIFIED",
+                "qualification_status": "DISQUALIFIED",
+                "is_qualified": False
+            }
+
+        # --- GATE 1: Deterministic Geography Checks ---
         if target_location and actual_location:
             t_loc = target_location.lower()
             a_loc = actual_location.lower()
-            # If target asks for Ethiopia/Addis Ababa and lead is in US, reject immediately
+            # If target asks for a specific city/country (e.g. Ethiopia/Addis) and lead is elsewhere, reject immediately
             if ("ethiopia" in t_loc or "addis" in t_loc) and not ("ethiopia" in a_loc or "addis" in a_loc):
                 return {
                     "fit_score": 0,
@@ -132,55 +371,150 @@ class GeminiService:
                     "is_qualified": False
                 }
 
-        # If user explicitly requested businesses without an official website
-        if require_no_website:
+        # --- GATE 1B: Website Status Evidence Validation ---
+        w_req = (requested_website_status or "Any").lower()
+        if require_no_website or w_req in ("missing", "no_official_website"):
             if website_status == "HAS_OFFICIAL_WEBSITE":
                 return {
                     "fit_score": 15,
-                    "fit_reason": f"Disqualified: Prospect already possesses an active official website ({website}). Not suitable for website development cold outreach.",
+                    "fit_reason": f"Disqualified: Prospect already possesses an active official website ({website}). Not suitable for website creation outreach.",
                     "fit_strengths": [],
-                    "fit_risks": ["Already has dedicated official website domain"],
+                    "fit_risks": ["Already has verified official website contrary to 'Missing' filter"],
+                    "status": "UNQUALIFIED",
+                    "qualification_status": "UNQUALIFIED",
+                    "is_qualified": False
+                }
+            elif website_status == "OUTDATED_WEBSITE":
+                return {
+                    "fit_score": 30,
+                    "fit_reason": f"Caveat: Prospect has an existing official website ({website}) that appears outdated, rather than missing entirely.",
+                    "fit_strengths": ["Has website needing redesign"],
+                    "fit_risks": ["Not completely missing an official website"],
+                    "status": "UNQUALIFIED",
+                    "qualification_status": "UNQUALIFIED",
+                    "is_qualified": False
+                }
+            elif website_status == "NO_OFFICIAL_WEBSITE_FOUND":
+                score = 88
+                is_qual = score >= min_qualification_score
+                return {
+                    "fit_score": score,
+                    "fit_reason": (
+                        f"High Fit: Business is active in {actual_location or target_location} with confirmed directory presence, "
+                        f"and research evidence confirms no dedicated official website exists. Prime candidate for {service_offered or 'website development'}."
+                    ),
+                    "fit_strengths": [
+                        "Confirmed missing official website from live search evidence",
+                        "Active business with verified directory presence",
+                        f"Direct need for {service_offered or 'website development'}"
+                    ],
+                    "fit_risks": ["Contact details may require phone or directory verification"],
+                    "status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "qualification_status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "is_qualified": is_qual
+                }
+            elif website_status == "WEBSITE_STATUS_UNCERTAIN":
+                score = 62
+                is_qual = score >= min_qualification_score
+                return {
+                    "fit_score": score,
+                    "fit_reason": f"Moderate Fit: Operating in target geography ({target_location}), but official website status could not be verified with 100% certainty.",
+                    "fit_strengths": [f"Operating in {target_location}"],
+                    "fit_risks": ["Website status could not be verified with certainty"],
+                    "status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "qualification_status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "is_qualified": is_qual
+                }
+
+        elif w_req == "outdated":
+            if website_status == "OUTDATED_WEBSITE":
+                score = 88
+                is_qual = score >= min_qualification_score
+                return {
+                    "fit_score": score,
+                    "fit_reason": f"High Fit: Official website exists ({website}) and research evidence confirms outdated design or legacy copyright.",
+                    "fit_strengths": [
+                        "Verified outdated official website",
+                        f"Direct need for modern redesign / {service_offered or 'website modernization'}"
+                    ],
+                    "fit_risks": [],
+                    "status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "qualification_status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "is_qualified": is_qual
+                }
+            elif website_status == "HAS_OFFICIAL_WEBSITE":
+                return {
+                    "fit_score": 25,
+                    "fit_reason": f"Disqualified: Prospect already possesses a modern, active official website ({website}).",
+                    "fit_strengths": [],
+                    "fit_risks": ["Already has modern active official website contrary to 'Outdated' filter"],
                     "status": "UNQUALIFIED",
                     "qualification_status": "UNQUALIFIED",
                     "is_qualified": False
                 }
             elif website_status == "NO_OFFICIAL_WEBSITE_FOUND":
                 return {
-                    "fit_score": 88,
-                    "fit_reason": (
-                        f"High Fit: Business is active in {actual_location or target_location} with online directory listings, "
-                        f"but has no official, dedicated website. Prime candidate for {service_offered or 'website development'}."
-                    ),
+                    "fit_score": 25,
+                    "fit_reason": f"Disqualified: Business completely lacks an official website, but search requested prospects with an outdated website.",
+                    "fit_strengths": [],
+                    "fit_risks": ["No website found to modernize"],
+                    "status": "UNQUALIFIED",
+                    "qualification_status": "UNQUALIFIED",
+                    "is_qualified": False
+                }
+
+        elif w_req in ("missing or outdated", "missing_or_outdated"):
+            if website_status in ("NO_OFFICIAL_WEBSITE_FOUND", "OUTDATED_WEBSITE"):
+                score = 88
+                is_qual = score >= min_qualification_score
+                status_desc = "confirmed missing official website" if website_status == "NO_OFFICIAL_WEBSITE_FOUND" else "verified outdated website"
+                return {
+                    "fit_score": score,
+                    "fit_reason": f"High Fit: Prospect has {status_desc} in {actual_location or target_location}, perfectly matching {service_offered or 'website development'}.",
                     "fit_strengths": [
-                        "Active business with verified directory presence",
-                        "No existing official website identified",
-                        f"Direct need for {service_offered or 'website development'}"
+                        f"{status_desc.capitalize()}",
+                        f"Immediate need for {service_offered or 'website development'}"
                     ],
-                    "fit_risks": ["Contact details may require manual phone/directory verification"],
-                    "status": "QUALIFIED",
-                    "qualification_status": "QUALIFIED",
-                    "is_qualified": True
+                    "fit_risks": [],
+                    "status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "qualification_status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "is_qualified": is_qual
+                }
+            elif website_status == "HAS_OFFICIAL_WEBSITE":
+                return {
+                    "fit_score": 20,
+                    "fit_reason": f"Disqualified: Prospect possesses an active modern official website ({website}).",
+                    "fit_strengths": [],
+                    "fit_risks": ["Already has active modern official website"],
+                    "status": "UNQUALIFIED",
+                    "qualification_status": "UNQUALIFIED",
+                    "is_qualified": False
                 }
             elif website_status == "WEBSITE_STATUS_UNCERTAIN":
+                score = 62
+                is_qual = score >= min_qualification_score
                 return {
-                    "fit_score": 68,
-                    "fit_reason": f"Potential Fit: Official website status is currently uncertain. Business is verified in {target_location}, but requires human confirmation before dispatch.",
-                    "fit_strengths": [f"Operating in target geography ({target_location})"],
-                    "fit_risks": ["Website presence could not be verified with 100% certainty"],
-                    "status": "QUALIFIED",
-                    "qualification_status": "QUALIFIED",
-                    "is_qualified": True
+                    "fit_score": score,
+                    "fit_reason": f"Moderate Fit: Business located in {target_location}, but official website status could not be verified with certainty.",
+                    "fit_strengths": [f"Operating in {target_location}"],
+                    "fit_risks": ["Official website status could not be verified with certainty"],
+                    "status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "qualification_status": "QUALIFIED" if is_qual else "UNQUALIFIED",
+                    "is_qualified": is_qual
                 }
 
         # --- GATE 2: Gemini AI Evaluation ---
         if self.is_configured():
+            dm_str = f"Target Decision-Makers: {', '.join(decision_makers)}" if decision_makers else ""
             prompt = f"""
 You are a strict, evidence-based B2B Sales Operations Specialist qualifying potential business prospects.
 
 [TARGET CRITERIA]
-Target Industry: {target_industry or 'General'}
+Target Industry/Business: {target_industry or 'General'}
 Target Location: {target_location or 'Any'}
 Service Being Offered: {service_offered or 'B2B Solutions'}
+Minimum Qualification Score Threshold: {min_qualification_score}
+{dm_str}
 Detailed Criteria: {target_criteria}
 
 [PROSPECT EVIDENCE]
@@ -191,22 +525,22 @@ Extracted Research / Landing Page Intel:
 {research_summary[:2500]}
 
 [TASK & QUALIFICATION RULES]
-1. Evaluate whether this company genuinely matches the target industry, geography, and service need.
-2. A poor match (such as an established leader with no need, or an irrelevant business) MUST receive a low score (< 50) and status "UNQUALIFIED".
-3. A score of 65 or above requires concrete evidence from the prospect's profile supporting customer fit.
-4. Output MUST be valid JSON strictly matching:
+1. The prospect MUST be a real individual operating commercial company. If Company Name ('{company_name}') or Landing Page Intel indicates it is a blog article, listicle (e.g., 'Top Fintech Startups in Ethiopia', '10 Best Hotels...'), media outlet, or directory rather than an actual company, assign fit_score: 0 and status: 'UNQUALIFIED'.
+2. Evaluate whether this company genuinely matches the target industry, geography, and service need.
+3. A poor match MUST receive a low score (< 50) and status "UNQUALIFIED".
+4. A score of {min_qualification_score} or above requires concrete evidence from the prospect's profile supporting customer fit.
+5. Output MUST be valid JSON strictly matching:
 {{
   "fit_score": <integer 0 to 100>,
   "fit_reason": "<2-3 sentence explanation based strictly on provided facts>",
   "fit_strengths": ["<factual strength 1>", "<factual strength 2>"],
   "fit_risks": ["<risk or blocker 1>"],
-  "status": "<'QUALIFIED' if fit_score >= 65 else 'UNQUALIFIED'>"
+  "status": "<'QUALIFIED' if fit_score >= {min_qualification_score} else 'UNQUALIFIED'>"
 }}
 Do not include markdown backticks or extra text outside the JSON.
 """
             try:
-                response = self.client.models.generate_content(
-                    model='gemini-2.5-flash',
+                response = self.generate_content_with_fallback(
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -224,7 +558,7 @@ Do not include markdown backticks or extra text outside the JSON.
 
                 data = json.loads(raw_text)
                 fit_score = int(data.get("fit_score", 40))
-                is_qual = fit_score >= 65
+                is_qual = fit_score >= min_qualification_score
                 status = "QUALIFIED" if is_qual else "UNQUALIFIED"
                 return {
                     "fit_score": fit_score,
@@ -236,7 +570,8 @@ Do not include markdown backticks or extra text outside the JSON.
                     "is_qualified": is_qual
                 }
             except Exception as e:
-                logger.error(f"Gemini API error during qualification: {e}. Using deterministic evaluation.")
+                err_msg = "Rate limit / quota reached" if ("429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)) else str(e)[:120]
+                logger.info(f"Gemini qualification unavailable ({err_msg}). Using deterministic evaluation.")
 
         # Deterministic Rule-Based Fallback (never fabricates generic fake 78 score)
         return self._deterministic_lead_analysis(
@@ -245,7 +580,9 @@ Do not include markdown backticks or extra text outside the JSON.
             target_location=target_location,
             actual_location=actual_location,
             service_offered=service_offered,
-            research_summary=research_summary
+            research_summary=research_summary,
+            min_qualification_score=min_qualification_score,
+            decision_makers=decision_makers
         )
 
     def _deterministic_lead_analysis(
@@ -255,7 +592,9 @@ Do not include markdown backticks or extra text outside the JSON.
         target_location: Optional[str],
         actual_location: Optional[str],
         service_offered: Optional[str],
-        research_summary: str
+        research_summary: str,
+        min_qualification_score: int = 60,
+        decision_makers: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """Strict deterministic fallback when AI API is unavailable."""
         summary_lower = research_summary.lower()
@@ -266,7 +605,7 @@ Do not include markdown backticks or extra text outside the JSON.
         ind_matched = False
         if target_industry:
             t_ind = target_industry.lower()
-            ind_matched = t_ind in summary_lower or any(p in summary_lower for p in ["saas", "software", "tech", "hotel", "fintech", "health", "agency"] if p in t_ind)
+            ind_matched = t_ind in summary_lower or any(p in summary_lower for p in ["saas", "software", "tech", "hotel", "resort", "fintech", "health", "agency", "restaurant", "hospitality"] if p in t_ind)
 
         if ind_matched:
             strengths.append(f"Profile confirms operations in {target_industry}")
@@ -282,8 +621,15 @@ Do not include markdown backticks or extra text outside the JSON.
             score -= 40
             risks.append(f"Geographic mismatch: located in {actual_location} instead of {target_location}")
 
+        if decision_makers:
+            for dm in decision_makers:
+                if dm.lower() in summary_lower:
+                    strengths.append(f"Identified leadership reference to {dm}")
+                    score += 5
+                    break
+
         score = max(0, min(100, score))
-        is_qual = score >= 65
+        is_qual = score >= min_qualification_score
         status = "QUALIFIED" if is_qual else "UNQUALIFIED"
         return {
             "fit_score": score,
@@ -353,8 +699,7 @@ Research Evidence:
 No markdown backticks or extra text outside JSON.
 """
             try:
-                response = self.client.models.generate_content(
-                    model='gemini-2.5-flash',
+                response = self.generate_content_with_fallback(
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -376,7 +721,8 @@ No markdown backticks or extra text outside JSON.
                     "body": data.get("body", f"Hello {contact_name or 'there'},\n\nI am contacting you regarding {company_name}...")
                 }
             except Exception as e:
-                logger.error(f"Gemini API error during email draft generation: {e}")
+                err_msg = "Rate limit / quota reached" if ("429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)) else str(e)[:120]
+                logger.info(f"Gemini email draft generation unavailable ({err_msg}). Using deterministic template.")
 
         # Deterministic Grounded Draft Fallback (no invented statistics)
         return self._deterministic_outreach_email(

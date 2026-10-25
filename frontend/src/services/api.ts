@@ -7,6 +7,8 @@ import type {
   AutomationRun,
   ActivityLog,
   DiscoverySchedule,
+  LeadSearchRequest,
+  LeadSearchResponse,
 } from '../types';
 
 const API_BASE = '/api';
@@ -38,8 +40,15 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Targeted Lead Search (9 Controlled Fields)
+  searchLeads: (data: LeadSearchRequest) =>
+    request<LeadSearchResponse>('/leads/search', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   // Chatbot
-  sendChat: (messages: { role: string; content: string }[]) =>
+  sendChat: (messages: { role: string; content: string }[], criteria?: LeadSearchRequest) =>
     request<{
       role: string;
       content: string;
@@ -49,7 +58,7 @@ export const api = {
       total_candidates?: number;
     }>('/chat', {
       method: 'POST',
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, criteria }),
     }),
 
   // Health
@@ -69,12 +78,13 @@ export const api = {
     request<void>(`/target-profiles/${id}`, { method: 'DELETE' }),
 
   // Leads
-  getLeads: (params?: { search?: string; status?: string; min_score?: number; is_overdue?: boolean }) => {
+  getLeads: (params?: { search?: string; status?: string; min_score?: number; is_overdue?: boolean; limit?: number }) => {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.append('search', params.search);
     if (params?.status && params.status !== 'ALL') searchParams.append('status', params.status);
     if (params?.min_score !== undefined) searchParams.append('min_score', params.min_score.toString());
     if (params?.is_overdue) searchParams.append('is_overdue', 'true');
+    searchParams.append('limit', (params?.limit || 250).toString());
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
     return request<Lead[]>(`/leads${query}`);
   },
@@ -200,6 +210,7 @@ export const api = {
     }),
 
   // Activity Logs
-  getActivityLogs: (limit: number = 50) => request<ActivityLog[]>(`/activity?limit=${limit}`),
+  getActivityLogs: (limit: number = 50, run_id?: number) =>
+    request<ActivityLog[]>(run_id ? `/activity?limit=${limit}&run_id=${run_id}` : `/activity?limit=${limit}`),
 };
 
