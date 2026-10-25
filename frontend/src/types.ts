@@ -150,6 +150,9 @@ export interface AutomationRun {
   id: number;
   profile_id?: number | null;
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  search_name?: string | null;
+  name?: string | null;
+  input_profile?: any;
   leads_discovered: number;
   leads_qualified: number;
   drafts_generated: number;

@@ -14,9 +14,36 @@ import {
   ArrowRight,
   MapPin
 } from 'lucide-react';
-import type { DashboardStats, OverdueLeadItem } from '../types';
+import type { DashboardStats, OverdueLeadItem, AutomationRun } from '../types';
 import { api } from '../services/api';
 import type { ActiveTab } from './Sidebar';
+
+const getSearchRunTitle = (run: AutomationRun): string => {
+  if (run.search_name && run.search_name.trim()) return run.search_name.trim();
+  if (run.name && run.name.trim()) return run.name.trim();
+
+  const inp = typeof run.input_profile === 'string'
+    ? (() => { try { return JSON.parse(run.input_profile); } catch { return null; } })()
+    : run.input_profile;
+
+  if (inp && typeof inp === 'object') {
+    if (inp.campaign_name && String(inp.campaign_name).trim()) {
+      return String(inp.campaign_name).trim();
+    }
+    const targetBiz = Array.isArray(inp.target_business) && inp.target_business.length > 0
+      ? inp.target_business.join(', ')
+      : inp.industry || '';
+    const location = inp.location || '';
+    const service = inp.service_offered || '';
+
+    if (targetBiz && location) return `${targetBiz} in ${location}`;
+    if (targetBiz) return `${targetBiz} Search`;
+    if (location) return `Companies in ${location}`;
+    if (service) return `${service} Search`;
+  }
+
+  return `Search Run #${run.id}`;
+};
 
 interface DashboardViewProps {
   stats: DashboardStats | null;
@@ -244,10 +271,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         }`}
                     />
                     <div>
-                      <div className="text-xs font-bold text-white">
-                        Run #{run.id}
+                      <div className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+                        <span>{getSearchRunTitle(run)}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#181824] border border-[#262638] text-slate-400 font-normal">
+                          Run #{run.id}
+                        </span>
                       </div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-slate-400 mt-0.5">
                         {run.leads_discovered} leads found • {run.leads_qualified} qualified • {run.drafts_generated} drafts
                       </div>
                     </div>

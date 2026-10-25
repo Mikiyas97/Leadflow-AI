@@ -1,5 +1,7 @@
 """Dashboard and Overview Statistics API Router"""
+import json
 from datetime import datetime
+from typing import Any, Dict
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -9,6 +11,44 @@ from backend.app.models import Lead, OutreachDraft, AutomationRun, ActivityLog
 from backend.app.schemas import DashboardStatsResponse
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+
+def resolve_run_search_name(run: AutomationRun) -> str:
+    """Generate a descriptive search query name from the run's input_profile or target profile."""
+    if run.profile and run.profile.name:
+        return run.profile.name
+
+    inp = run.input_profile
+    if isinstance(inp, str):
+        try:
+            inp = json.loads(inp)
+        except Exception:
+            inp = None
+
+    if isinstance(inp, dict):
+        camp = inp.get("campaign_name")
+        if camp and str(camp).strip():
+            return str(camp).strip()
+
+        tb = inp.get("target_business")
+        if isinstance(tb, list) and tb:
+            ind = ", ".join(tb)
+        else:
+            ind = inp.get("industry") or ""
+
+        loc = inp.get("location") or ""
+        service = inp.get("service_offered")
+
+        if ind and loc:
+            return f"{ind} in {loc}"
+        elif ind:
+            return f"{ind} Search"
+        elif loc:
+            return f"Companies in {loc}"
+        elif service:
+            return f"{service} Search"
+
+    return f"Lead Search #{run.id}"
 
 
 @router.get("/stats", response_model=DashboardStatsResponse)
@@ -59,7 +99,25 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "qualification_rate": qualification_rate
     }
 
-    recent_runs = db.query(AutomationRun).order_by(AutomationRun.started_at.desc()).limit(5).all()
+    recent_runs_raw = db.query(AutomationRun).order_by(AutomationRun.started_at.desc()).limit(10).all()
+    recent_runs = []
+    for r in recent_runs_raw:
+        s_name = resolve_run_search_name(r)
+        recent_runs.append({
+            "id": r.id,
+            "profile_id": r.profile_id,
+            "status": r.status,
+            "name": s_name,
+            "search_name": s_name,
+            "input_profile": r.input_profile,
+            "leads_discovered": r.leads_discovered,
+            "leads_qualified": r.leads_qualified,
+            "drafts_generated": r.drafts_generated,
+            "error_summary": r.error_summary,
+            "started_at": r.started_at,
+            "completed_at": r.completed_at
+        })
+
     recent_activities = db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(10).all()
 
     return {
@@ -76,4 +134,3 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "recent_runs": recent_runs,
         "recent_activities": recent_activities
     }
-
